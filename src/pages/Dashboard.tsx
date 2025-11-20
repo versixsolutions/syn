@@ -1,25 +1,36 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useDashboardStats } from '../hooks/useDashboardStats'
-import { formatCurrency } from '../lib/utils'
+import { formatCurrency, formatDateTime } from '../lib/utils'
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Despesa, Ocorrencia } from '../types'
+
+// Interface unificada para o feed de atualizações
+interface DashboardUpdate {
+  id: string
+  type: 'comunicado' | 'despesa' | 'ocorrencia' | 'votacao' | 'faq'
+  title: string
+  description: string
+  date: string
+  icon: string
+  color: string
+  bgColor: string
+  link: string
+  isPinned?: boolean // Para comunicados urgentes
+}
 
 export default function Dashboard() {
   const navigate = useNavigate()
   const { profile, signOut } = useAuth()
-  const { stats } = useDashboardStats()
+  const { stats, loading: loadingStats } = useDashboardStats()
   const [unreadCount, setUnreadCount] = useState(0)
-  
-  // Novos estados para listas dinâmicas
-  const [recentDespesas, setRecentDespesas] = useState<Despesa[]>([])
-  const [recentOcorrencias, setRecentOcorrencias] = useState<Ocorrencia[]>([])
+  const [updates, setUpdates] = useState<DashboardUpdate[]>([])
+  const [loadingUpdates, setLoadingUpdates] = useState(true)
 
   useEffect(() => {
     loadUnreadCount()
-    loadRecentData()
-  }, [])
+    loadUnifiedFeed()
+  }, [profile?.id])
 
   async function loadUnreadCount() {
     try {
@@ -37,52 +48,147 @@ export default function Dashboard() {
     }
   }
 
-  async function loadRecentData() {
+  // Função central que busca dados de todas as tabelas e unifica em uma timeline
+  async function loadUnifiedFeed() {
     try {
-      // Carregar 3 últimas despesas
+      setLoadingUpdates(true)
+
+      // 1. Buscar Comunicados Recentes (Limit 5)
+      const { data: comunicados } = await supabase
+        .from('comunicados')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      // 2. Buscar Despesas Recentes (Limit 5)
       const { data: despesas } = await supabase
         .from('despesas')
-        .select('*') // Retorna description, amount, category, due_date
-        .order('due_date', { ascending: false })
-        .limit(3)
-      
-      if (despesas) setRecentDespesas(despesas)
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5)
 
-      // Carregar 3 últimas ocorrências
+      // 3. Buscar Ocorrências Recentes (Limit 5)
       const { data: ocorrencias } = await supabase
         .from('ocorrencias')
         .select('*')
         .order('created_at', { ascending: false })
+        .limit(5)
+
+      // 4. Buscar Votações Recentes (Limit 3)
+      const { data: votacoes } = await supabase
+        .from('votacoes')
+        .select('*')
+        .order('created_at', { ascending: false })
         .limit(3)
 
-      if (ocorrencias) setRecentOcorrencias(ocorrencias)
+      // 5. Buscar FAQs Recentes (Limit 3)
+      const { data: faqs } = await supabase
+        .from('faqs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(3)
 
+      // Normalizar dados para o formato DashboardUpdate
+      const normalizedUpdates: DashboardUpdate[] = []
+
+      comunicados?.forEach(c => {
+        const isUrgent = c.priority === 'urgente' || c.type === 'urgente'
+        normalizedUpdates.push({
+          id: `com-${c.id}`,
+          type: 'comunicado',
+          title: isUrgent ? `COMUNICADO URGENTE: ${c.title}` : c.title,
+          description: c.content.substring(0, 100) + (c.content.length > 100 ? '...' : ''),
+          date: c.created_at,
+          icon: isUrgent ? '📢' : '📌',
+          color: isUrgent ? 'text-red-600' : 'text-blue-600',
+          bgColor: isUrgent ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-100',
+          link: '/comunicados',
+          isPinned: isUrgent
+        })
+      })
+
+      despesas?.forEach(d => {
+        normalizedUpdates.push({
+          id: `desp-${d.id}`,
+          type: 'despesa',
+          title: 'Nova Despesa Registrada',
+          description: `${d.description} - ${formatCurrency(d.amount)}`,
+          date: d.created_at,
+          icon: '💰',
+          color: 'text-green-600',
+          bgColor: 'bg-white border-gray-100',
+          link: '/despesas'
+        })
+      })
+
+      ocorrencias?.forEach(o => {
+        normalizedUpdates.push({
+          id: `oco-${o.id}`,
+          type: 'ocorrencia',
+          title: `Atualização em Ocorrência: ${o.status.replace('_', ' ')}`,
+          description: o.title,
+          date: o.updated_at || o.created_at,
+          icon: '🚨',
+          color: 'text-orange-600',
+          bgColor: 'bg-white border-gray-100',
+          link: '/ocorrencias'
+        })
+      })
+
+      votacoes?.forEach(v => {
+        const isActive = new Date(v.end_date) > new Date()
+        normalizedUpdates.push({
+          id: `vot-${v.id}`,
+          type: 'votacao',
+          title: isActive ? 'Nova Votação Iniciada' : 'Votação Encerrada',
+          description: v.title,
+          date: v.created_at,
+          icon: '🗳️',
+          color: 'text-purple-600',
+          bgColor: 'bg-purple-50 border-purple-100',
+          link: '/votacoes'
+        })
+      })
+
+      faqs?.forEach(f => {
+        normalizedUpdates.push({
+          id: `faq-${f.id}`,
+          type: 'faq',
+          title: 'Nova Pergunta Respondida',
+          description: f.question,
+          date: f.created_at,
+          icon: '❓',
+          color: 'text-cyan-600',
+          bgColor: 'bg-white border-gray-100',
+          link: '/faq'
+        })
+      })
+
+      // Ordenar por data (mais recente primeiro) e prioridade (pinned primeiro)
+      const sorted = normalizedUpdates.sort((a, b) => {
+        if (a.isPinned && !b.isPinned) return -1
+        if (!a.isPinned && b.isPinned) return 1
+        return new Date(b.date).getTime() - new Date(a.date).getTime()
+      })
+
+      setUpdates(sorted.slice(0, 20)) // Pegar apenas os 20 últimos eventos
     } catch (error) {
-      console.error('Erro ao carregar dados recentes:', error)
+      console.error('Erro ao carregar feed:', error)
+    } finally {
+      setLoadingUpdates(false)
     }
   }
 
-  // Helper simples para ícones de categoria (já que agora é texto livre no banco)
-  function getCategoryIcon(category: string | null) {
-    const cat = category?.toLowerCase() || ''
-    if (cat.includes('água') || cat.includes('agua')) return '💧'
-    if (cat.includes('luz') || cat.includes('energia')) return '⚡'
-    if (cat.includes('limpeza') || cat.includes('serviço')) return '🧹'
-    if (cat.includes('manutenção')) return '🔧'
-    return '📝'
-  }
+  function formatTimeAgo(dateString: string) {
+    const diff = new Date().getTime() - new Date(dateString).getTime()
+    const minutes = Math.floor(diff / 60000)
+    const hours = Math.floor(diff / 3600000)
+    const days = Math.floor(diff / 86400000)
 
-  function getStatusColor(status: string) {
-    switch (status) {
-      case 'aberto': return 'bg-blue-100 text-blue-600'
-      case 'em_andamento': return 'bg-orange-100 text-orange-600'
-      case 'resolvido': return 'bg-green-100 text-green-600'
-      default: return 'bg-gray-100 text-gray-600'
-    }
-  }
-
-  function formatStatus(status: string) {
-    return status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
+    if (days > 0) return `há ${days} dia${days > 1 ? 's' : ''}`
+    if (hours > 0) return `há ${hours}h`
+    if (minutes > 0) return `há ${minutes}m`
+    return 'agora'
   }
 
   return (
@@ -136,9 +242,13 @@ export default function Dashboard() {
           <p className="text-gray-600">Bem-vindo ao seu painel de gestão condominial</p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div onClick={() => navigate('/faq')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-lg cursor-pointer">
+        {/* Stats Cards com Rolagem Horizontal no Mobile */}
+        <div className="
+          flex flex-nowrap overflow-x-auto snap-x snap-mandatory gap-4 pb-4 mb-6
+          md:grid md:grid-cols-4 md:overflow-visible md:pb-0 md:snap-none
+          scrollbar-hide
+        ">
+          <div onClick={() => navigate('/faq')} className="min-w-[260px] snap-center bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-lg cursor-pointer transition-transform hover:-translate-y-1">
             <div className="flex items-center justify-between mb-3">
               <div className="text-4xl">❓</div>
             </div>
@@ -147,7 +257,7 @@ export default function Dashboard() {
             <p className="text-xs text-gray-500">perguntas respondidas</p>
           </div>
 
-          <div onClick={() => navigate('/despesas')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-lg cursor-pointer">
+          <div onClick={() => navigate('/despesas')} className="min-w-[260px] snap-center bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-lg cursor-pointer transition-transform hover:-translate-y-1">
             <div className="flex items-center justify-between mb-3">
               <div className="text-4xl">💰</div>
             </div>
@@ -156,7 +266,7 @@ export default function Dashboard() {
             <p className="text-xs text-gray-500">{stats.despesas.count} lançamentos no mês</p>
           </div>
 
-          <div onClick={() => navigate('/votacoes')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-lg cursor-pointer relative">
+          <div onClick={() => navigate('/votacoes')} className="min-w-[260px] snap-center bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-lg cursor-pointer relative transition-transform hover:-translate-y-1">
             <div className="flex items-center justify-between mb-3">
               <div className="text-4xl">🗳️</div>
               {stats.votacoes.ativas > 0 && (
@@ -172,7 +282,7 @@ export default function Dashboard() {
             </p>
           </div>
 
-          <div onClick={() => navigate('/ocorrencias')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-lg cursor-pointer">
+          <div onClick={() => navigate('/ocorrencias')} className="min-w-[260px] snap-center bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-lg cursor-pointer transition-transform hover:-translate-y-1">
             <div className="flex items-center justify-between mb-3">
               <div className="text-4xl">🚨</div>
               {(stats.ocorrencias.abertas + stats.ocorrencias.em_andamento) > 0 && (
@@ -189,88 +299,76 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ÚLTIMAS DESPESAS (AGORA DINÂMICO) */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-900">Últimas Despesas</h3>
-            <button
-              onClick={() => navigate('/despesas')}
-              className="text-primary text-sm font-semibold hover:text-primary-dark flex items-center gap-1"
-            >
-              Ver todas →
-            </button>
+        {/* Feed Unificado: Últimas Atualizações */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              ⚡ Últimas Atualizações
+            </h3>
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+              Em tempo real
+            </span>
           </div>
           
-          <div className="space-y-3">
-            {recentDespesas.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-4">Nenhuma despesa registrada.</p>
-            ) : (
-              recentDespesas.map((despesa) => (
-                <div
-                  key={despesa.id}
-                  onClick={() => navigate('/despesas')}
-                  className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-lg transition cursor-pointer"
-                >
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center flex-shrink-0 border border-blue-100">
-                      <span className="text-2xl">{getCategoryIcon(despesa.category)}</span>
+          {loadingUpdates ? (
+            <div className="space-y-4 animate-pulse">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-20 bg-gray-100 rounded-lg"></div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-0">
+              {updates.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-4">Nenhuma atualização recente.</p>
+              ) : (
+                updates.map((item, index) => (
+                  <div
+                    key={item.id}
+                    onClick={() => navigate(item.link)}
+                    className={`
+                      relative flex gap-4 p-4 transition cursor-pointer hover:bg-gray-50
+                      ${index !== updates.length - 1 ? 'border-b border-gray-100' : ''}
+                      ${item.isPinned ? 'bg-yellow-50/50 hover:bg-yellow-50' : ''}
+                    `}
+                  >
+                    {/* Linha do tempo vertical */}
+                    <div className="absolute left-[2rem] top-0 bottom-0 w-px bg-gray-100 -z-10 md:block hidden"></div>
+
+                    {/* Ícone */}
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-xl shadow-sm z-10 ${item.bgColor}`}>
+                      {item.icon}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      {/* AQUI: description em vez de title */}
-                      <p className="font-semibold text-gray-900 text-sm truncate capitalize">
-                        {despesa.description}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Vence em: {new Date(despesa.due_date).toLocaleDateString('pt-BR')}
+
+                    {/* Conteúdo */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start gap-2">
+                        <h4 className={`text-sm md:text-base font-bold truncate pr-2 ${item.color}`}>
+                          {item.isPinned && <span className="mr-2 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded uppercase tracking-wide">Fixo</span>}
+                          {item.title}
+                        </h4>
+                        <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
+                          {formatTimeAgo(item.date)}
+                        </span>
+                      </div>
+                      <p className="text-xs md:text-sm text-gray-600 mt-1 line-clamp-2">
+                        {item.description}
                       </p>
                     </div>
                   </div>
-                  <span className="text-lg font-bold text-gray-900 flex-shrink-0">
-                    {formatCurrency(despesa.amount)}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* OCORRÊNCIAS RECENTES (AGORA DINÂMICO) */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-900">Ocorrências Recentes</h3>
-            <button
-              onClick={() => navigate('/ocorrencias')}
-              className="text-primary text-sm font-semibold hover:text-primary-dark flex items-center gap-1"
-            >
-              Ver todas →
-            </button>
-          </div>
+                ))
+              )}
+            </div>
+          )}
           
-          <div className="space-y-3">
-            {recentOcorrencias.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-4">Nenhuma ocorrência registrada.</p>
-            ) : (
-              recentOcorrencias.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => navigate('/ocorrencias')}
-                  className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:border-primary transition cursor-pointer"
-                >
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${getStatusColor(item.status)}`}>
-                    {formatStatus(item.status)}
-                  </span>
-                  <p className="flex-1 text-sm text-gray-700 truncate font-medium">{item.title}</p>
-                  <span className="text-xs text-gray-500 flex-shrink-0">
-                    {new Date(item.created_at).toLocaleDateString('pt-BR')}
-                  </span>
-                </div>
-              ))
-            )}
+          <div className="mt-6 text-center">
+             <button onClick={() => navigate('/comunicados')} className="text-primary text-sm font-semibold hover:underline">
+               Ver todos os comunicados &rarr;
+             </button>
           </div>
         </div>
       </main>
 
-      {/* Mobile Menu (Mantido Igual, apenas ajustando nomes de rotas se necessário) */}
+      {/* Mobile Menu */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden z-50 safe-area-pb">
         <div className="grid grid-cols-5 gap-1">
           <button onClick={() => navigate('/')} className="flex flex-col items-center py-3 text-primary">
