@@ -34,8 +34,7 @@ export default function Dashboard() {
 
   async function loadUnifiedFeed() {
     setLoadingUpdates(true)
-    const newUpdates: DashboardUpdate[] = []
-
+    
     // Função auxiliar para buscar dados com tratamento de erro individual
     const fetchData = async (table: string, queryBuilder: any) => {
       try {
@@ -52,30 +51,27 @@ export default function Dashboard() {
     }
 
     // Buscas individuais
-    // 1. Comunicados - CORREÇÃO: Usar 'published_at' em vez de 'created_at'
     const comunicados = await fetchData('comunicados', 
       supabase.from('comunicados').select('*').order('published_at', { ascending: false }).limit(5)
     )
 
-    // 2. Despesas
     const despesas = await fetchData('despesas', 
       supabase.from('despesas').select('*').order('created_at', { ascending: false }).limit(5)
     )
 
-    // 3. Ocorrências
     const ocorrencias = await fetchData('ocorrencias', 
       supabase.from('ocorrencias').select('*').order('created_at', { ascending: false }).limit(5)
     )
 
-    // 4. Votações
     const votacoes = await fetchData('votacoes', 
       supabase.from('votacoes').select('*').order('created_at', { ascending: false }).limit(3)
     )
 
-    // 5. FAQs
     const faqs = await fetchData('faqs', 
       supabase.from('faqs').select('*').order('created_at', { ascending: false }).limit(3)
     )
+
+    const newUpdates: DashboardUpdate[] = []
 
     // Processamento dos dados
     comunicados?.forEach((c: any) => {
@@ -85,7 +81,6 @@ export default function Dashboard() {
         type: 'comunicado',
         title: isUrgent ? `COMUNICADO URGENTE: ${c.title}` : c.title,
         description: c.content,
-        // CORREÇÃO: Usar 'published_at' aqui também
         date: c.published_at, 
         icon: isUrgent ? '📢' : '📌',
         color: isUrgent ? 'text-red-600' : 'text-blue-600',
@@ -163,7 +158,7 @@ export default function Dashboard() {
   }
 
   function formatTimeAgo(dateString: string) {
-    if (!dateString) return '' // Proteção contra data nula
+    if (!dateString) return ''
     const diff = new Date().getTime() - new Date(dateString).getTime()
     const minutes = Math.floor(diff / 60000)
     const hours = Math.floor(diff / 3600000)
@@ -206,7 +201,10 @@ export default function Dashboard() {
           </div>
           <h3 className="text-base font-bold text-gray-900 mb-1">Despesas</h3>
           <p className="text-2xl font-bold text-green-600 mb-1">{formatCurrency(stats.despesas.totalMes)}</p>
-          <p className="text-xs text-gray-500">{stats.despesas.count} lançamentos no mês</p>
+          {/* CORREÇÃO AQUI: Texto dinâmico do mês */}
+          <p className="text-xs text-gray-500">
+            {stats.despesas.count} lançamentos em {stats.despesas.monthLabel}
+          </p>
         </div>
 
         <div onClick={() => navigate('/votacoes')} className="min-w-[260px] snap-center bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-lg cursor-pointer relative transition-transform hover:-translate-y-1">
