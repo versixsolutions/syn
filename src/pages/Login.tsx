@@ -49,7 +49,7 @@ export default function Login() {
             className="w-40 h-auto mx-auto mb-4"
           />
           {/* Título atualizado para Pinheiro Park */}
-          <h1 className="text-3xl font-bold text-gray-900">Meu Condomínio</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Syn</h1>
           <p className="text-gray-600 mt-2">Versix - Gestão à vista. Confiança total.</p>
         </div>
 

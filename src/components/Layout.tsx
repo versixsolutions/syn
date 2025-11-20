@@ -57,7 +57,7 @@ export default function Layout() {
               </div>
               <div>
                 <h1 className="text-lg md:text-xl font-bold tracking-tight leading-tight">
-                  Versix Meu Condomínio
+                  Versix Syn
                 </h1>
                 <p className="text-xs opacity-90 font-medium flex flex-col md:flex-row md:gap-1">
                   <span className="font-bold text-white">
