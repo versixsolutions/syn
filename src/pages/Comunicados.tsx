@@ -106,7 +106,18 @@ export default function Comunicados() {
   if (loading) return <LoadingSpinner />
 
   return (
-    <PageLayout title="Quadro de Avisos" subtitle="Fique por dentro de tudo" icon="📢">
+    <PageLayout title="Mural de Comunicados" subtitle="Fique por dentro de tudo" icon="📢"
+      headerAction={
+        unreadCount > 0 ? (
+          <div className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full inline-block border border-white/30 shadow-sm">
+            <p className="text-xs font-bold text-white flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse"></span>
+              {unreadCount} não lidos
+            </p>
+          </div>
+        ) : null
+      }
+    >
       
       {/* --- 1. CARDS DE RESUMO (Layout Scrollável Horizontal no Mobile) --- */}
       <div className="
