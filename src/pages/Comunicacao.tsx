@@ -25,7 +25,8 @@ export default function Comunicacao() {
                 📰
               </div>
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Mural de Avisos</h3>
+                {/* ALTERADO DE 'Mural de Avisos' PARA 'Comunicados' */}
+                <h3 className="text-xl font-bold text-gray-900">Comunicados</h3>
                 <p className="text-gray-500 text-sm mt-1">Comunicados oficiais, circulares e notícias.</p>
               </div>
             </div>
