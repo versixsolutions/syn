@@ -111,7 +111,7 @@ export default function Dashboard() {
         icon: '💰',
         color: 'text-green-600',
         bgColor: 'bg-white border-gray-100',
-        link: '/despesas'
+        link: '/transparencia'
       })
     })
 
@@ -134,7 +134,7 @@ export default function Dashboard() {
       newUpdates.push({
         id: `vot-${v.id}`,
         type: 'votacao',
-        title: isActive ? 'Nova Votação' : 'Votação Encerrada',
+        title: isActive ? 'Nova Assembleia' : 'Votação Encerrada',
         description: v.title,
         date: v.created_at,
         icon: '🗳️',
@@ -211,8 +211,6 @@ export default function Dashboard() {
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
         </button>
 
-        {/* NOTA: A seta pulsante overlay foi removida para evitar cliques acidentais no mobile */}
-
         {/* Lista de Cards Scrollável */}
         <div 
           ref={scrollContainerRef}
@@ -245,19 +243,19 @@ export default function Dashboard() {
             <p className="text-[10px] text-gray-400 uppercase font-semibold">Dúvidas respondidas</p>
           </div>
 
-          {/* CARD 3: Despesas */}
-          <div onClick={() => navigate('/despesas')} className="min-w-[200px] md:min-w-[220px] snap-center bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:shadow-lg cursor-pointer transition-transform hover:-translate-y-1">
+          {/* CARD 3: Transparência (Antigo Despesas) */}
+          <div onClick={() => navigate('/transparencia')} className="min-w-[200px] md:min-w-[220px] snap-center bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:shadow-lg cursor-pointer transition-transform hover:-translate-y-1">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-3xl">💰</div>
+              <div className="text-3xl">💰</div> {/* Ícone Financeiro */}
             </div>
-            <h3 className="text-sm font-bold text-gray-900 mb-0.5">Despesas</h3>
+            <h3 className="text-sm font-bold text-gray-900 mb-0.5">Transparência</h3>
             <p className="text-xl font-bold text-green-600 mb-0.5">{formatCurrency(stats.despesas.totalMes)}</p>
             <p className="text-[10px] text-gray-400 uppercase font-semibold truncate">
               Em {stats.despesas.monthLabel}
             </p>
           </div>
 
-          {/* CARD 4: Votações */}
+          {/* CARD 4: Assembleia Digital (Antigo Votações) */}
           <div onClick={() => navigate('/votacoes')} className="min-w-[200px] md:min-w-[220px] snap-center bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:shadow-lg cursor-pointer relative transition-transform hover:-translate-y-1">
             <div className="flex items-center justify-between mb-2">
               <div className="text-3xl">🗳️</div>
@@ -267,7 +265,7 @@ export default function Dashboard() {
                 </span>
               )}
             </div>
-            <h3 className="text-sm font-bold text-gray-900 mb-0.5">Votações</h3>
+            <h3 className="text-sm font-bold text-gray-900 mb-0.5">Assembleia Digital</h3>
             <p className="text-2xl font-bold text-primary mb-0.5">{stats.votacoes.ativas}</p>
             <p className="text-[10px] text-gray-400 uppercase font-semibold">Em andamento</p>
           </div>
