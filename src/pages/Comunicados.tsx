@@ -30,7 +30,7 @@ const TYPE_CONFIG: Record<string, any> = {
   'geral': { label: 'Geral', color: 'bg-gray-100 text-gray-800 border-gray-200', icon: '📋' }
 }
 
-// Sub-componente Card (Mantido igual, apenas contexto)
+// Sub-componente Card
 function ComunicadoCard({ comunicado, onMarkRead }: { comunicado: Comunicado, onMarkRead: (id: string) => void }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const typeConfig = TYPE_CONFIG[comunicado.type] || TYPE_CONFIG['geral']
@@ -108,23 +108,29 @@ export default function Comunicados() {
   return (
     <PageLayout title="Quadro de Avisos" subtitle="Fique por dentro de tudo" icon="📢">
       
-      {/* --- 1. CARDS DE RESUMO (PADRÃO ÚNICO) --- */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+      {/* --- 1. CARDS DE RESUMO (Layout Scrollável Horizontal no Mobile) --- */}
+      <div className="
+        flex flex-nowrap overflow-x-auto snap-x snap-mandatory gap-4 pb-4 mb-6
+        md:grid md:grid-cols-3 md:overflow-visible md:pb-0 md:snap-none
+        scrollbar-hide
+      ">
+        <div className="min-w-[240px] snap-center bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex flex-col justify-between">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Total de Avisos</p>
           <div className="flex items-end justify-between">
             <p className="text-3xl font-bold text-gray-800">{comunicados.length}</p>
             <span className="text-2xl">📋</span>
           </div>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+
+        <div className="min-w-[240px] snap-center bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex flex-col justify-between">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Não Lidos</p>
           <div className="flex items-end justify-between">
             <p className="text-3xl font-bold text-purple-600">{unreadCount}</p>
             <span className="text-2xl">📬</span>
           </div>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+
+        <div className="min-w-[240px] snap-center bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex flex-col justify-between">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Urgentes</p>
           <div className="flex items-end justify-between">
             <p className="text-3xl font-bold text-red-600">{comunicados.filter(c => c.priority >= 3).length}</p>
@@ -133,7 +139,7 @@ export default function Comunicados() {
         </div>
       </div>
 
-      {/* --- 2. BARRA DE FILTROS (PADRÃO ÚNICO) --- */}
+      {/* --- 2. BARRA DE FILTROS --- */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 sticky top-20 z-30">
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
           <button onClick={() => setSelectedType(null)} className={`px-4 py-1.5 rounded-full text-xs font-bold border transition shrink-0 ${!selectedType ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>Todos</button>
