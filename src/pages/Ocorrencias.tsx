@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom' // Importação necessária
 import { supabase } from '../lib/supabase'
 import { formatDateTime } from '../lib/utils'
 import PageLayout from '../components/PageLayout'
@@ -26,6 +27,7 @@ const STATUS_CONFIG: any = {
 }
 
 export default function Ocorrencias() {
+  const navigate = useNavigate() // Hook de navegação
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null)
@@ -85,12 +87,15 @@ export default function Ocorrencias() {
       subtitle="Acompanhe e reporte problemas do condomínio"
       icon="🚨"
       headerAction={
-        <button className="bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-lg font-bold hover:bg-white/30 transition text-sm flex items-center gap-2 border border-white/30">
+        <button 
+          onClick={() => navigate('/ocorrencias/nova')} // Ação de Navegação Adicionada
+          className="bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-lg font-bold hover:bg-white/30 transition text-sm flex items-center gap-2 border border-white/30"
+        >
           <span className="text-lg">+</span> Nova
         </button>
       }
     >
-      {/* --- 1. CARDS DE RESUMO (Layout Scrollável Horizontal no Mobile) --- */}
+      {/* --- 1. CARDS DE RESUMO (Layout Scrollável Horizontal) --- */}
       <div className="
         flex flex-nowrap overflow-x-auto snap-x snap-mandatory gap-4 pb-4 mb-6
         md:grid md:grid-cols-3 md:overflow-visible md:pb-0 md:snap-none
@@ -121,7 +126,7 @@ export default function Ocorrencias() {
         </div>
       </div>
 
-      {/* --- 2. BARRA DE FILTROS (PADRÃO ÚNICO) --- */}
+      {/* --- 2. BARRA DE FILTROS --- */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 sticky top-20 z-30">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
           <span className="text-xs font-bold text-gray-400 uppercase mr-2 shrink-0">Filtrar:</span>

@@ -17,6 +17,7 @@ import Suporte from './pages/Suporte'
 import Comunicacao from './pages/Comunicacao'
 import Biblioteca from './pages/Biblioteca'
 import Layout from './components/Layout'
+import NovaOcorrencia from './pages/NovaOcorrencia'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth()
@@ -56,7 +57,7 @@ export default function App() {
               <Route path="/biblioteca" element={<Biblioteca />} />
               <Route path="/comunicados" element={<Comunicados />} />
               <Route path="/votacoes" element={<Votacoes />} />
-              
+              <Route path="/ocorrencias/nova" element={<NovaOcorrencia />} />
               <Route path="/despesas" element={<Navigate to="/transparencia" replace />} />
             </Route>
           </Routes>
