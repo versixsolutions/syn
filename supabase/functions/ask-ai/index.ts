@@ -1,14 +1,15 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-// CORREÇÃO 1: Usar esm.sh com versão mais recente e importar 'env'
-import { pipeline, env } from 'https://esm.sh/@xenova/transformers@2.16.0'
+
+// ALTERAÇÃO: Usando jsdelivr para maior estabilidade e evitando erro 500 do esm.sh
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// CORREÇÃO 2: Configurações vitais para rodar no Supabase Edge (Deno)
+// Configurações obrigatórias para Deno
 env.useBrowserCache = false;
 env.allowLocalModels = false;
 
@@ -26,7 +27,7 @@ class EmbeddingPipeline {
   }
 }
 
-serve(async (req) => {
+serve(async (req: Request) => { // Tipagem explícita para 'req'
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -48,7 +49,7 @@ serve(async (req) => {
     // Buscar Documentos
     const { data: documents, error: matchError } = await supabase.rpc('match_documents', {
       query_embedding: embedding,
-      match_threshold: 0.70, 
+      match_threshold: 0.60, 
       match_count: 3, 
     })
 
