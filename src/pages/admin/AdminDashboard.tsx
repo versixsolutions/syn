@@ -69,12 +69,21 @@ export default function AdminDashboard() {
         <p className="text-gray-500">Resumo das atividades do condomínio.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* ALTERAÇÃO: Layout responsivo híbrido 
+        - Mobile: Flexbox com scroll horizontal (snap)
+        - Desktop: Grid tradicional
+      */}
+      <div className="
+        flex flex-nowrap overflow-x-auto snap-x snap-mandatory gap-4 pb-4
+        md:grid md:grid-cols-2 lg:grid-cols-4 md:overflow-visible md:pb-0 md:snap-none
+        scrollbar-hide
+      ">
         {cards.map((card) => (
           <div 
             key={card.title} 
             onClick={() => navigate(card.link)}
             className={`
+              min-w-[260px] snap-center md:min-w-0
               bg-white p-6 rounded-xl shadow-sm border transition-all cursor-pointer
               ${card.title === 'Aprovar Cadastros' && (pendingCount || 0) > 0 ? 'border-red-200 ring-1 ring-red-100' : 'border-gray-200'}
               hover:shadow-md hover:-translate-y-1
