@@ -1,18 +1,21 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import type { User, Session } from '@supabase/supabase-js'
+// Importando o tipo atualizado
+import type { UserRole } from '../types'
 
 interface UserProfile {
   id: string
   email: string
   full_name: string | null
-  role: 'sindico' | 'morador' | 'admin' | 'pending'
-  phone: string | null          // Novo
-  unit_number: string | null    // Novo
-  resident_type: string | null  // Novo
-  is_whatsapp: boolean | null   // Novo
+  role: UserRole // Tipagem forte
+  phone: string | null
+  unit_number: string | null
+  resident_type: string | null
+  is_whatsapp: boolean | null
   condominio_id: string | null
   condominio_name: string | null
+  avatar_url?: string | null
 }
 
 interface AuthContextType {
@@ -32,8 +35,16 @@ interface AuthContextType {
     isWhatsapp: boolean
   ) => Promise<void>
   signOut: () => Promise<void>
-  isSindico: boolean
-  isAdmin: boolean
+  
+  // Helpers de Permissão (Novos)
+  isAdmin: boolean       // Acesso total
+  isSindico: boolean     // Gestão
+  isSubSindico: boolean  // Apoio
+  isConselho: boolean    // Auditoria/Leitura avançada
+  isMorador: boolean     // Acesso básico
+  
+  // Helper de função composta (Ex: Pode gerenciar?)
+  canManage: boolean     // True para Admin, Sindico e Sub
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -84,6 +95,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ...data,
           condominio_name: data.condominios?.name || null,
           condominio_id: data.condominio_id,
+          // Força o cast para o tipo UserRole para garantir compatibilidade
+          role: (data.role as UserRole) || 'morador' 
         }
         setProfile(mappedProfile)
       }
@@ -120,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           unit_number: unitNumber,
           resident_type: residentType,
           is_whatsapp: isWhatsapp,
+          role: 'pending' // Todo cadastro começa como pendente/morador até aprovação
         },
       },
     })
@@ -131,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signOut()
       if (error) console.warn('Aviso no logout:', error.message)
     } catch (err) {
-      console.warn('Sessão já estava encerrada ou inválida:', err)
+      console.warn('Sessão já encerrada:', err)
     } finally {
       setProfile(null)
       setUser(null)
@@ -140,6 +154,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Lógica de Permissões
+  const role = profile?.role || 'morador'
+  
   const value = {
     user,
     profile,
@@ -148,8 +165,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn,
     signUp,
     signOut,
-    isSindico: profile?.role === 'sindico',
-    isAdmin: profile?.role === 'admin',
+    
+    // Helpers Booleanos para facilitar o uso nos componentes
+    isAdmin: role === 'admin',
+    isSindico: role === 'sindico',
+    isSubSindico: role === 'sub_sindico',
+    isConselho: role === 'conselho',
+    isMorador: role === 'morador' || role === 'pending',
+    
+    // Permissão composta: Quem pode gerenciar/editar coisas
+    canManage: ['admin', 'sindico', 'sub_sindico'].includes(role)
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -79,7 +79,9 @@ export default function Comunicados() {
   const [comunicados, setComunicados] = useState<Comunicado[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedType, setSelectedType] = useState<string | null>(null)
-  const { user } = useAuth()
+  
+  // Pegamos o 'canManage' (Admin/Sindico) do contexto
+  const { user, canManage } = useAuth()
 
   useEffect(() => { loadComunicados() }, [user])
 
@@ -106,20 +108,37 @@ export default function Comunicados() {
   if (loading) return <LoadingSpinner />
 
   return (
-    <PageLayout title="Mural de Comunicados" subtitle="Fique por dentro de tudo" icon="📢"
+    <PageLayout 
+      title="Mural de Comunicados" 
+      subtitle="Fique por dentro de tudo" 
+      icon="📢"
+      // Ação do Cabeçalho: Condicional baseada na Permissão
       headerAction={
-        unreadCount > 0 ? (
-          <div className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full inline-block border border-white/30 shadow-sm">
-            <p className="text-xs font-bold text-white flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse"></span>
-              {unreadCount} não lidos
-            </p>
-          </div>
-        ) : null
+        <div className="flex items-center gap-3">
+          {/* Badge de não lidos (Visível para todos) */}
+          {unreadCount > 0 && (
+            <div className="bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/30 shadow-sm">
+              <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse"></span>
+                {unreadCount} novos
+              </p>
+            </div>
+          )}
+
+          {/* Botão de Criar (Apenas Síndico/Admin) */}
+          {canManage && (
+            <button 
+              onClick={() => alert('Funcionalidade de Novo Comunicado em breve!')} 
+              className="bg-white text-purple-700 px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-50 transition shadow-sm flex items-center gap-1"
+            >
+              <span>+</span> Novo Aviso
+            </button>
+          )}
+        </div>
       }
     >
       
-      {/* --- 1. CARDS DE RESUMO (Layout Scrollável Horizontal no Mobile) --- */}
+      {/* --- 1. CARDS DE RESUMO --- */}
       <div className="
         flex flex-nowrap overflow-x-auto snap-x snap-mandatory gap-4 pb-4 mb-6
         md:grid md:grid-cols-3 md:overflow-visible md:pb-0 md:snap-none

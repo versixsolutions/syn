@@ -1,39 +1,56 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useDashboardStats } from '../hooks/useDashboardStats'
 import { useTheme } from '../contexts/ThemeContext'
 import LoadingSpinner from './LoadingSpinner'
 
+interface NavItem {
+  path: string
+  label: string
+  icon: string
+  badge?: number
+  adminOnly?: boolean // Propriedade para controle de acesso
+}
+
 export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { profile, signOut } = useAuth()
+  
+  // Pegamos 'canManage' para verificar se é Admin/Síndico
+  const { profile, signOut, canManage } = useAuth()
   const { stats } = useDashboardStats()
   const { theme, loading } = useTheme()
   
-  // Estado para controlar o menu sidebar (desktop)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-
   const isActive = (path: string) => location.pathname === path
 
-  // Menu Desktop (Lateral)
-  const desktopNavItems = [
+  // MENU DESKTOP
+  // Adicionamos a propriedade adminOnly onde necessário
+  const desktopNavItems: NavItem[] = [
     { path: '/', label: 'Dashboard', icon: '🏠' },
     { path: '/comunicacao', label: 'Comunicação', icon: '📢' },
     { path: '/suporte', label: 'Suporte', icon: '🤝' },
     { path: '/transparencia', label: 'Transparência', icon: '💰' },
     { path: '/perfil', label: 'Perfil', icon: '👤' },
+    
+    // Exemplo de Rota Futura (Só aparece para Síndico/Admin)
+    // { path: '/admin', label: 'Painel do Síndico', icon: '⚙️', adminOnly: true },
   ]
 
-  // Menu Mobile (Inferior)
-  const mobileNavItems = [
+  // MENU MOBILE
+  const mobileNavItems: NavItem[] = [
     { path: '/', label: 'Início', icon: '🏠' },
     { path: '/comunicacao', label: 'Comunicação', icon: '📢' },
     { path: '/suporte', label: 'Suporte', icon: '🤝' },
     { path: '/transparencia', label: 'Transparência', icon: '💰' },
     { path: '/perfil', label: 'Perfil', icon: '👤' },
   ]
+
+  // Filtros de Segurança
+  // Se o item for adminOnly, só mostra se canManage for true
+  const visibleDesktopItems = desktopNavItems.filter(item => !item.adminOnly || canManage)
+  const visibleMobileItems = mobileNavItems.filter(item => !item.adminOnly || canManage)
 
   async function handleLogout() {
     if (confirm('Tem certeza que deseja sair?')) {
@@ -46,7 +63,7 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans flex flex-col">
-      {/* Header Desktop e Mobile */}
+      {/* Header */}
       <header 
         className="text-white shadow-lg sticky top-0 z-40 transition-all duration-500"
         style={{ background: theme.gradients.header }}
@@ -54,7 +71,7 @@ export default function Layout() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              {/* MENU HAMBÚRGUER (Apenas Desktop) */}
+              {/* Botão Menu Hambúrguer (Desktop Sidebar) */}
               <button 
                 onClick={() => setIsSidebarOpen(true)}
                 className="hidden md:flex p-2 rounded-lg hover:bg-white/20 transition"
@@ -66,13 +83,11 @@ export default function Layout() {
               </button>
 
               <Link to="/" className="flex items-center gap-3 group">
-                {/* LOGO ALTERADA AQUI - Mesma do Login */}
                 <img 
                   src="/assets/logos/versix-solutions-logo.png" 
                   alt="Versix Meu Condomínio" 
                   className="h-10 w-auto bg-white rounded-md p-1 shadow-sm object-contain"
                 />
-                
                 <div>
                   <h1 className="text-lg md:text-xl font-bold tracking-tight leading-tight">
                     Versix Meu Condomínio
@@ -128,7 +143,8 @@ export default function Layout() {
           </div>
 
           <nav className="flex-1 space-y-2">
-            {desktopNavItems.map((item) => (
+            {/* Renderiza apenas itens permitidos */}
+            {visibleDesktopItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
@@ -141,6 +157,11 @@ export default function Layout() {
               >
                 <span className="text-xl">{item.icon}</span>
                 <span>{item.label}</span>
+                {item.badge !== undefined && item.badge > 0 && (
+                   <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full px-2 py-0.5">
+                     {item.badge}
+                   </span>
+                )}
               </Link>
             ))}
           </nav>
@@ -159,10 +180,10 @@ export default function Layout() {
         </div>
       </aside>
 
-      {/* Mobile Bottom Nav */}
+      {/* Mobile Bottom Nav - Renderiza itens filtrados */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 pb-safe safe-area-pb">
-        <div className="grid grid-cols-5 gap-1 p-1">
-          {mobileNavItems.map((item) => {
+        <div className={`grid gap-1 p-1 ${visibleMobileItems.length === 5 ? 'grid-cols-5' : 'grid-cols-' + visibleMobileItems.length}`}>
+          {visibleMobileItems.map((item) => {
             const active = isActive(item.path)
             return (
               <Link
@@ -178,6 +199,11 @@ export default function Layout() {
                 <span className={`text-[9px] font-medium truncate w-full text-center ${active ? 'font-bold' : ''}`}>
                   {item.label}
                 </span>
+                {item.badge !== undefined && item.badge > 0 && (
+                  <span className="absolute top-1 right-1 bg-red-500 text-white text-[9px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center border border-white">
+                    {item.badge > 9 ? '9+' : item.badge}
+                  </span>
+                )}
               </Link>
             )
           })}
