@@ -30,10 +30,10 @@ export default function Dashboard() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (profile?.id) {
+    if (profile?.condominio_id) {
       loadUnifiedFeed()
     }
-  }, [profile?.id])
+  }, [profile?.condominio_id])
 
   // Função para rolar os cards horizontalmente (apenas Desktop via botão)
   const scrollCards = (direction: 'left' | 'right') => {
@@ -49,123 +49,148 @@ export default function Dashboard() {
   async function loadUnifiedFeed() {
     setLoadingUpdates(true)
     
+    // Helper para buscar dados de forma segura
     const fetchData = async (table: string, queryBuilder: any) => {
       try {
         const { data, error } = await queryBuilder
         if (error) {
-          console.error(`Erro ao buscar ${table}:`, error.message)
+          console.warn(`Aviso: Falha ao buscar ${table}`, error.message)
           return []
         }
         return data
       } catch (err) {
-        console.error(`Exceção ao buscar ${table}:`, err)
+        console.warn(`Exceção ao buscar ${table}`, err)
         return []
       }
     }
 
-    const comunicados = await fetchData('comunicados', 
-      supabase.from('comunicados').select('*').order('published_at', { ascending: false }).limit(5)
-    )
+    try {
+      // PERFORMANCE: Executa todas as queries em paralelo!
+      const [comunicados, despesas, ocorrencias, votacoes, faqs] = await Promise.all([
+        fetchData('comunicados', 
+          supabase.from('comunicados')
+            .select('*')
+            .eq('condominio_id', profile?.condominio_id)
+            .order('published_at', { ascending: false })
+            .limit(5)
+        ),
+        fetchData('despesas', 
+          supabase.from('despesas')
+            .select('*')
+            .eq('condominio_id', profile?.condominio_id)
+            .order('created_at', { ascending: false })
+            .limit(5)
+        ),
+        fetchData('ocorrencias', 
+          supabase.from('ocorrencias')
+            .select('*')
+            .eq('condominio_id', profile?.condominio_id)
+            .order('created_at', { ascending: false })
+            .limit(5)
+        ),
+        fetchData('votacoes', 
+          supabase.from('votacoes')
+            .select('*')
+            .eq('condominio_id', profile?.condominio_id)
+            .order('created_at', { ascending: false })
+            .limit(3)
+        ),
+        fetchData('faqs', 
+          supabase.from('faqs')
+            .select('*')
+            .eq('condominio_id', profile?.condominio_id)
+            .order('created_at', { ascending: false })
+            .limit(3)
+        )
+      ])
 
-    const despesas = await fetchData('despesas', 
-      supabase.from('despesas').select('*').order('created_at', { ascending: false }).limit(5)
-    )
+      const newUpdates: DashboardUpdate[] = []
 
-    const ocorrencias = await fetchData('ocorrencias', 
-      supabase.from('ocorrencias').select('*').order('created_at', { ascending: false }).limit(5)
-    )
-
-    const votacoes = await fetchData('votacoes', 
-      supabase.from('votacoes').select('*').order('created_at', { ascending: false }).limit(3)
-    )
-
-    const faqs = await fetchData('faqs', 
-      supabase.from('faqs').select('*').order('created_at', { ascending: false }).limit(3)
-    )
-
-    const newUpdates: DashboardUpdate[] = []
-
-    comunicados?.forEach((c: any) => {
-      const isUrgent = c.priority === 'urgente' || c.type === 'urgente'
-      newUpdates.push({
-        id: `com-${c.id}`,
-        type: 'comunicado',
-        title: isUrgent ? `URGENTE: ${c.title}` : c.title,
-        description: c.content,
-        date: c.published_at, 
-        icon: isUrgent ? '📢' : '📌',
-        color: isUrgent ? 'text-red-600' : 'text-blue-600',
-        bgColor: isUrgent ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-100',
-        link: '/comunicados',
-        isPinned: isUrgent
+      comunicados?.forEach((c: any) => {
+        const isUrgent = c.priority === 'urgente' || c.type === 'urgente' || c.priority >= 3
+        newUpdates.push({
+          id: `com-${c.id}`,
+          type: 'comunicado',
+          title: isUrgent ? `URGENTE: ${c.title}` : c.title,
+          description: c.content,
+          date: c.published_at, 
+          icon: isUrgent ? '📢' : '📌',
+          color: isUrgent ? 'text-red-600' : 'text-blue-600',
+          bgColor: isUrgent ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-100',
+          link: '/comunicados',
+          isPinned: isUrgent
+        })
       })
-    })
 
-    despesas?.forEach((d: any) => {
-      newUpdates.push({
-        id: `desp-${d.id}`,
-        type: 'despesa',
-        title: 'Nova Despesa',
-        description: `${d.description} - ${formatCurrency(d.amount)}`,
-        date: d.created_at,
-        icon: '💰',
-        color: 'text-green-600',
-        bgColor: 'bg-white border-gray-100',
-        link: '/transparencia'
+      despesas?.forEach((d: any) => {
+        newUpdates.push({
+          id: `desp-${d.id}`,
+          type: 'despesa',
+          title: 'Nova Despesa',
+          description: `${d.description} - ${formatCurrency(d.amount)}`,
+          date: d.created_at,
+          icon: '💰',
+          color: 'text-green-600',
+          bgColor: 'bg-white border-gray-100',
+          link: '/transparencia'
+        })
       })
-    })
 
-    ocorrencias?.forEach((o: any) => {
-      newUpdates.push({
-        id: `oco-${o.id}`,
-        type: 'ocorrencia',
-        title: `Ocorrência Atualizada`,
-        description: o.title,
-        date: o.updated_at || o.created_at,
-        icon: '🚨',
-        color: 'text-orange-600',
-        bgColor: 'bg-white border-gray-100',
-        link: '/ocorrencias'
+      ocorrencias?.forEach((o: any) => {
+        newUpdates.push({
+          id: `oco-${o.id}`,
+          type: 'ocorrencia',
+          title: `Ocorrência: ${o.status}`,
+          description: o.title,
+          date: o.updated_at || o.created_at,
+          icon: '🚨',
+          color: 'text-orange-600',
+          bgColor: 'bg-white border-gray-100',
+          link: '/ocorrencias'
+        })
       })
-    })
 
-    votacoes?.forEach((v: any) => {
-      const isActive = new Date(v.end_date) > new Date()
-      newUpdates.push({
-        id: `vot-${v.id}`,
-        type: 'votacao',
-        title: isActive ? 'Nova Assembleia' : 'Votação Encerrada',
-        description: v.title,
-        date: v.created_at,
-        icon: '🗳️',
-        color: 'text-purple-600',
-        bgColor: 'bg-purple-50 border-purple-100',
-        link: '/votacoes'
+      votacoes?.forEach((v: any) => {
+        const isActive = new Date(v.end_date) > new Date()
+        newUpdates.push({
+          id: `vot-${v.id}`,
+          type: 'votacao',
+          title: isActive ? 'Nova Assembleia' : 'Votação Encerrada',
+          description: v.title,
+          date: v.created_at,
+          icon: '🗳️',
+          color: 'text-purple-600',
+          bgColor: 'bg-purple-50 border-purple-100',
+          link: '/votacoes'
+        })
       })
-    })
 
-    faqs?.forEach((f: any) => {
-      newUpdates.push({
-        id: `faq-${f.id}`,
-        type: 'faq',
-        title: 'Pergunta Respondida',
-        description: f.question,
-        date: f.created_at,
-        icon: '❓',
-        color: 'text-cyan-600',
-        bgColor: 'bg-white border-gray-100',
-        link: '/faq'
+      faqs?.forEach((f: any) => {
+        newUpdates.push({
+          id: `faq-${f.id}`,
+          type: 'faq',
+          title: 'Dúvida Respondida',
+          description: f.question,
+          date: f.created_at,
+          icon: '❓',
+          color: 'text-cyan-600',
+          bgColor: 'bg-white border-gray-100',
+          link: '/faq'
+        })
       })
-    })
 
-    const sorted = newUpdates.sort((a, b) => {
-      if (a.isPinned && !b.isPinned) return -1
-      if (!a.isPinned && b.isPinned) return 1
-      return new Date(b.date).getTime() - new Date(a.date).getTime()
-    })
+      const sorted = newUpdates.sort((a, b) => {
+        if (a.isPinned && !b.isPinned) return -1
+        if (!a.isPinned && b.isPinned) return 1
+        return new Date(b.date).getTime() - new Date(a.date).getTime()
+      })
 
-    setUpdates(sorted.slice(0, 20))
-    setLoadingUpdates(false)
+      setUpdates(sorted.slice(0, 20))
+    } catch (error) {
+      console.error("Erro geral no dashboard:", error)
+    } finally {
+      setLoadingUpdates(false)
+    }
   }
 
   function formatTimeAgo(dateString: string) {
@@ -189,7 +214,9 @@ export default function Dashboard() {
         <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
           Olá, {profile?.full_name?.split(' ')[0]}! 👋
         </h2>
-        <p className="text-gray-600 text-sm">Bem-vindo ao seu painel</p>
+        <p className="text-gray-600 text-sm">
+          {profile?.condominio_name ? `Condomínio ${profile.condominio_name}` : 'Bem-vindo ao Versix Norma'}
+        </p>
       </div>
 
       {/* Container de Cards com Setas de Navegação (Apenas Desktop) */}
@@ -243,10 +270,10 @@ export default function Dashboard() {
             <p className="text-[10px] text-gray-400 uppercase font-semibold">Dúvidas respondidas</p>
           </div>
 
-          {/* CARD 3: Transparência (Antigo Despesas) */}
+          {/* CARD 3: Transparência */}
           <div onClick={() => navigate('/transparencia')} className="min-w-[200px] md:min-w-[220px] snap-center bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:shadow-lg cursor-pointer transition-transform hover:-translate-y-1">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-3xl">💰</div> {/* Ícone Financeiro */}
+              <div className="text-3xl">💰</div>
             </div>
             <h3 className="text-sm font-bold text-gray-900 mb-0.5">Transparência</h3>
             <p className="text-xl font-bold text-green-600 mb-0.5">{formatCurrency(stats.despesas.totalMes)}</p>
@@ -255,7 +282,7 @@ export default function Dashboard() {
             </p>
           </div>
 
-          {/* CARD 4: Assembleia Digital (Antigo Votações) */}
+          {/* CARD 4: Assembleia */}
           <div onClick={() => navigate('/votacoes')} className="min-w-[200px] md:min-w-[220px] snap-center bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:shadow-lg cursor-pointer relative transition-transform hover:-translate-y-1">
             <div className="flex items-center justify-between mb-2">
               <div className="text-3xl">🗳️</div>
