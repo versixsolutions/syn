@@ -1,8 +1,8 @@
 import * as pdfjsLib from 'pdfjs-dist'
 
-// Configura o Worker do PDF.js (necessário para processar o arquivo)
-// Usamos uma CDN para evitar configurações complexas de build no Vite
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+// Configuração do Worker usando UNPKG com versão fixa para estabilidade.
+// A versão deve bater com a instalada no package.json (5.4.394)
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.4.394/build/pdf.worker.min.mjs`
 
 export async function extractTextFromPDF(file: File): Promise<string> {
   try {
@@ -26,6 +26,6 @@ export async function extractTextFromPDF(file: File): Promise<string> {
     return fullText
   } catch (error) {
     console.error('Erro ao ler PDF:', error)
-    throw new Error('Não foi possível extrair o texto do PDF.')
+    throw new Error('Não foi possível extrair o texto do PDF. Verifique se o arquivo é válido.')
   }
 }
