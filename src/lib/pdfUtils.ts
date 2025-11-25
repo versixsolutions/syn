@@ -2,7 +2,8 @@ import * as pdfjsLib from 'pdfjs-dist'
 
 // Configuração do Worker usando UNPKG com versão fixa para estabilidade.
 // A versão deve bater com a instalada no package.json (5.4.394)
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.4.394/build/pdf.worker.min.mjs`
+// Alterado para usar a URL correta do unpkg que corresponde à versão instalada
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
 
 export async function extractTextFromPDF(file: File): Promise<string> {
   try {
