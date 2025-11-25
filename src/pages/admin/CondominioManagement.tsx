@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import PageLayout from '../../components/PageLayout' // Caminho corrigido
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
 import Modal from '../../components/ui/Modal'
@@ -25,6 +24,10 @@ const INITIAL_FORM = {
   state: '',
   email: '',
   phone: '',
+  
+  // 1.1 Localização (Novo)
+  latitude: '',
+  longitude: '',
   
   // 2. Identidade Visual
   primaryColor: '#1F4080',
@@ -72,7 +75,21 @@ export default function CondominioManagement() {
     }
   }
 
-  // --- BUSCA CNPJ VIA BRASILAPI ---
+  // Helper para buscar coordenadas via OpenStreetMap (Nominatim)
+  const fetchCoordinates = async (fullAddress: string) => {
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}&limit=1`)
+      const data = await response.json()
+      if (data && data.length > 0) {
+        return { lat: data[0].lat, lon: data[0].lon }
+      }
+    } catch (e) {
+      console.warn('Erro ao buscar coordenadas:', e)
+    }
+    return null
+  }
+
+  // --- BUSCA CNPJ VIA BRASILAPI + GEOLOCALIZAÇÃO ---
   const handleCnpjSearch = async () => {
     const cleanCnpj = formData.cnpj.replace(/\D/g, '')
     
@@ -82,7 +99,7 @@ export default function CondominioManagement() {
     }
 
     setIsSearchingCnpj(true)
-    const toastId = toast.loading('Consultando Receita Federal...')
+    const toastId = toast.loading('Consultando Receita e Mapa...')
 
     try {
       const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`)
@@ -96,7 +113,8 @@ export default function CondominioManagement() {
       const data = await response.json()
 
       // Formata endereço
-      const address = `${data.logradouro}, ${data.numero} ${data.complemento || ''} - ${data.bairro}`
+      const addressSimple = `${data.logradouro}, ${data.numero}`
+      const addressFull = `${addressSimple}, ${data.bairro}, ${data.municipio} - ${data.uf}`
       
       // Define nome de exibição (Fantasia ou Razão Social)
       const displayName = data.nome_fantasia || data.razao_social
@@ -107,19 +125,28 @@ export default function CondominioManagement() {
         .normalize('NFD').replace(/[\u0300-\u036f]/g, "") // Remove acentos
         .replace(/[^a-z0-9]/g, '') // Remove caracteres especiais
 
+      // Tenta buscar coordenadas
+      let coords = { lat: '', lon: '' }
+      const geoData = await fetchCoordinates(addressFull)
+      if (geoData) {
+        coords = { lat: geoData.lat, lon: geoData.lon }
+      }
+
       setFormData(prev => ({
         ...prev,
         razaoSocial: data.razao_social,
         name: displayName, // Nome Fantasia
-        address: address,
+        address: addressFull,
         city: data.municipio,
         state: data.uf,
         email: data.email || '',
         phone: data.ddd_telefone_1 || '',
-        slug: !prev.slug ? suggestedSlug : prev.slug // Só preenche se estiver vazio
+        slug: !prev.slug ? suggestedSlug : prev.slug,
+        latitude: coords.lat,
+        longitude: coords.lon
       }))
 
-      toast.success('Dados preenchidos com sucesso!', { id: toastId })
+      toast.success('Dados e localização preenchidos!', { id: toastId })
 
     } catch (error: any) {
       console.error(error)
@@ -156,6 +183,10 @@ export default function CondominioManagement() {
           contact: {
             email: formData.email,
             phone: formData.phone
+          },
+          location: {
+            latitude: formData.latitude,
+            longitude: formData.longitude
           }
         }
       }
@@ -214,6 +245,20 @@ export default function CondominioManagement() {
                 {cond.theme_config?.cadastro?.address || 'Endereço não informado'}
               </p>
               
+              {cond.theme_config?.cadastro?.location?.latitude && (
+                <div className="mb-4">
+                  <a 
+                    href={`https://www.google.com/maps?q=${cond.theme_config.cadastro.location.latitude},${cond.theme_config.cadastro.location.longitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    Ver no Mapa
+                  </a>
+                </div>
+              )}
+              
               <div className="flex gap-2 border-t border-gray-100 pt-3">
                 <button className="flex-1 text-xs font-bold text-gray-600 hover:bg-gray-50 py-2 rounded">
                   Editar
@@ -242,7 +287,6 @@ export default function CondominioManagement() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              {/* CAMPO DE BUSCA CNPJ */}
               <div className="col-span-2">
                 <label className="block text-xs font-bold text-gray-600 mb-1">CNPJ (apenas números)</label>
                 <div className="flex gap-2">
@@ -263,7 +307,7 @@ export default function CondominioManagement() {
                     {isSearchingCnpj ? '...' : '🔍 Buscar'}
                   </button>
                 </div>
-                <p className="text-[10px] text-gray-500 mt-1 ml-1">Preenchimento automático via Receita Federal</p>
+                <p className="text-[10px] text-gray-500 mt-1 ml-1">Auto-preenchimento + Geolocalização</p>
               </div>
 
               <div className="col-span-2">
@@ -288,14 +332,29 @@ export default function CondominioManagement() {
                 <label className="block text-xs font-bold text-gray-600 mb-1">Endereço Completo</label>
                 <input type="text" className="w-full px-3 py-2 border rounded-lg text-sm bg-white" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
               </div>
+              
+              {/* CAMPOS DE GEOLOCALIZAÇÃO */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Cidade</label>
-                <input type="text" className="w-full px-3 py-2 border rounded-lg text-sm bg-white" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
+                <label className="block text-xs font-bold text-gray-600 mb-1">Latitude</label>
+                <input type="text" className="w-full px-3 py-2 border rounded-lg text-sm bg-white font-mono text-xs" value={formData.latitude} onChange={e => setFormData({...formData, latitude: e.target.value})} placeholder="-23.5505" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">UF</label>
-                <input type="text" className="w-full px-3 py-2 border rounded-lg text-sm bg-white" value={formData.state} onChange={e => setFormData({...formData, state: e.target.value})} />
+                <label className="block text-xs font-bold text-gray-600 mb-1">Longitude</label>
+                <input type="text" className="w-full px-3 py-2 border rounded-lg text-sm bg-white font-mono text-xs" value={formData.longitude} onChange={e => setFormData({...formData, longitude: e.target.value})} placeholder="-46.6333" />
               </div>
+              
+              {(formData.latitude && formData.longitude) && (
+                <div className="col-span-2 flex justify-end">
+                  <a 
+                    href={`https://www.google.com/maps?q=${formData.latitude},${formData.longitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                  >
+                    📍 Testar no Google Maps
+                  </a>
+                </div>
+              )}
             </div>
           </div>
 
