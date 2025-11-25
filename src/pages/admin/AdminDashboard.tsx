@@ -3,10 +3,12 @@ import { supabase } from '../../lib/supabase'
 import { useDashboardStats } from '../../hooks/useDashboardStats'
 import { formatCurrency } from '../../lib/utils'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext' // Importar contexto para verificar permissão de IA
 
 export default function AdminDashboard() {
   const { stats } = useDashboardStats()
   const navigate = useNavigate()
+  const { isAdmin } = useAuth() // Para verificar se pode ver o botão de IA
   const [pendingCount, setPendingCount] = useState<number | null>(null)
 
   useEffect(() => {
@@ -105,31 +107,56 @@ export default function AdminDashboard() {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <h3 className="font-bold text-gray-900 mb-4">Atalhos Operacionais</h3>
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => alert('Em breve')} className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 text-left text-sm font-medium text-gray-700 transition group">
-              <span className="group-hover:scale-110 inline-block transition-transform">📢</span> Criar Comunicado
+            <button 
+              onClick={() => navigate('/admin/comunicados')} 
+              className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 text-left text-sm font-medium text-gray-700 transition group"
+            >
+              <span className="group-hover:scale-110 inline-block transition-transform mr-2">📢</span> Criar Comunicado
             </button>
-            <button onClick={() => alert('Em breve')} className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 text-left text-sm font-medium text-gray-700 transition group">
-              <span className="group-hover:scale-110 inline-block transition-transform">🗳️</span> Nova Assembleia
+            
+            <button 
+              onClick={() => navigate('/admin/votacoes')} 
+              className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 text-left text-sm font-medium text-gray-700 transition group"
+            >
+              <span className="group-hover:scale-110 inline-block transition-transform mr-2">🗳️</span> Nova Assembleia
             </button>
-            <button onClick={() => alert('Em breve')} className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 text-left text-sm font-medium text-gray-700 transition group">
-              <span className="group-hover:scale-110 inline-block transition-transform">🧠</span> Treinar Chatbot
-            </button>
-            <button onClick={() => alert('Em breve')} className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 text-left text-sm font-medium text-gray-700 transition group">
-              <span className="group-hover:scale-110 inline-block transition-transform">💰</span> Lançar Despesa
+            
+            {/* Botão de IA só aparece se tiver a rota ou permissão, 
+                mas como é um atalho, pode redirecionar para a gestão de conhecimento 
+                ou uma página de FAQ Admin se houver */}
+            {isAdmin && (
+              <button 
+                onClick={() => navigate('/admin/ia')} 
+                className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 text-left text-sm font-medium text-gray-700 transition group"
+              >
+                <span className="group-hover:scale-110 inline-block transition-transform mr-2">🧠</span> Treinar Chatbot
+              </button>
+            )}
+            
+            <button 
+              onClick={() => navigate('/admin/financeiro')} 
+              className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 text-left text-sm font-medium text-gray-700 transition group"
+            >
+              <span className="group-hover:scale-110 inline-block transition-transform mr-2">💰</span> Lançar Despesa
             </button>
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-blue-900 to-slate-900 text-white p-6 rounded-xl shadow-lg relative overflow-hidden">
+        <div className="bg-gradient-to-br from-blue-900 to-slate-900 text-white p-6 rounded-xl shadow-lg relative overflow-hidden flex flex-col justify-between">
           <div className="relative z-10">
             <h3 className="font-bold text-lg mb-2">Inteligência Artificial</h3>
-            {/* ALTERADO DE Ísis PARA Norma */}
             <p className="text-blue-100 text-sm mb-4">A Norma respondeu a 45 dúvidas esta semana. Mantenha a base de conhecimento atualizada para melhorar as respostas.</p>
-            <button className="bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 px-4 py-2 rounded-lg text-sm font-bold transition">
-              Ver logs da IA
-            </button>
+            
+            {isAdmin && (
+              <button 
+                onClick={() => navigate('/admin/ia')}
+                className="bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2"
+              >
+                <span>🧠</span> Ver logs da IA
+              </button>
+            )}
           </div>
-          <div className="absolute -right-4 -bottom-8 text-9xl opacity-10">🤖</div>
+          <div className="absolute -right-4 -bottom-8 text-9xl opacity-10 pointer-events-none">🤖</div>
         </div>
       </div>
     </div>
