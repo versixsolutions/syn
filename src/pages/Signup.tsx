@@ -59,12 +59,17 @@ export default function Signup() {
   const { signUp } = useAuth()
   const { condominios, loading: loadingCondominios } = useCondominios()
 
-  // Atualiza blocos disponíveis quando condomínio muda
+  // LÓGICA INTELIGENTE DE BLOCOS:
+  // Atualiza a lista de blocos disponíveis sempre que o usuário troca o condomínio selecionado.
   useEffect(() => {
     if (formData.condominioId) {
       const selectedCondo = condominios.find(c => c.id === formData.condominioId)
+      // Acessa a configuração do tema salva no banco (JSONB)
       const blocksConfig = selectedCondo?.theme_config?.structure?.blocks || []
       setAvailableBlocks(blocksConfig)
+      
+      // Reseta o campo bloco para evitar que fique com valor inválido ao trocar de condomínio
+      setFormData(prev => ({ ...prev, block: '' }))
     } else {
       setAvailableBlocks([])
     }
@@ -152,7 +157,7 @@ export default function Signup() {
             </div>
           )}
 
-          {/* 1. Nome e Sobrenome (Grid) */}
+          {/* 1. Nome e Sobrenome */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Nome</label>
@@ -200,7 +205,7 @@ export default function Signup() {
             {fieldErrors.condominioId && <p className="text-red-500 text-xs mt-1">{fieldErrors.condominioId}</p>}
           </div>
 
-          {/* 3. Tipo de Morador (Seleção Visual) */}
+          {/* 3. Tipo de Morador */}
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-2 uppercase">Eu sou:</label>
             <div className="grid grid-cols-3 gap-2">
@@ -228,10 +233,12 @@ export default function Signup() {
             </div>
           </div>
 
-          {/* 4. Endereço (Bloco e Unidade) */}
+          {/* 4. Endereço (Bloco e Unidade) - COM LÓGICA DE DROPDOWN */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Bloco / Rua</label>
+              
+              {/* RENDERIZAÇÃO CONDICIONAL: SELECT OU INPUT */}
               {availableBlocks.length > 0 ? (
                 <select
                   name="block"
@@ -252,8 +259,10 @@ export default function Signup() {
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none ${fieldErrors.block ? 'border-red-500' : 'border-gray-300'}`}
                 />
               )}
+              
               {fieldErrors.block && <p className="text-red-500 text-[10px] mt-1">{fieldErrors.block}</p>}
             </div>
+            
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Nº Unidade</label>
               <input

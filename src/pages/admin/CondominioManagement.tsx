@@ -68,9 +68,9 @@ const INITIAL_FORM = {
   secondaryColor: '#00A86B',
   logoUrl: '',
   
-  // 3. Estrutura
+  // 3. Estrutura (Agora é um array de strings)
   totalUnits: '',
-  blocks: '', // Input de texto separado por vírgulas
+  blocks: [] as string[], 
   
   // 4. Módulos
   modules: {
@@ -89,6 +89,9 @@ export default function CondominioManagement() {
   const [isSearchingCnpj, setIsSearchingCnpj] = useState(false)
   const [formData, setFormData] = useState(INITIAL_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
+  
+  // Estado local para o input de novo bloco
+  const [newBlockInput, setNewBlockInput] = useState('')
 
   useEffect(() => {
     loadCondominios()
@@ -110,6 +113,32 @@ export default function CondominioManagement() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // --- MANIPULAÇÃO DA LISTA DE BLOCOS ---
+  const handleAddBlock = (e?: React.FormEvent) => {
+    if (e) e.preventDefault() // Previne submit do form se apertar enter
+    
+    const val = newBlockInput.trim()
+    if (!val) return
+
+    if (formData.blocks.includes(val)) {
+      toast.error('Este bloco/rua já foi adicionado.')
+      return
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      blocks: [...prev.blocks, val]
+    }))
+    setNewBlockInput('')
+  }
+
+  const handleRemoveBlock = (blockToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      blocks: prev.blocks.filter(b => b !== blockToRemove)
+    }))
   }
 
   // --- BUSCA CNPJ VIA BRASILAPI ---
@@ -139,7 +168,6 @@ export default function CondominioManagement() {
       const addressFull = `${addressSimple}, ${data.bairro}, ${data.municipio} - ${data.uf}`
       const displayName = data.nome_fantasia || data.razao_social
       
-      // Gera slug sugerido
       const suggestedSlug = displayName
         .toLowerCase()
         .normalize('NFD').replace(/[\u0300-\u036f]/g, "")
@@ -167,14 +195,13 @@ export default function CondominioManagement() {
     }
   }
 
-  // --- AÇÃO: ABRIR MODAL PARA NOVO ---
   const handleOpenNew = () => {
     setFormData(INITIAL_FORM)
+    setNewBlockInput('')
     setEditingId(null)
     setIsModalOpen(true)
   }
 
-  // --- AÇÃO: ABRIR MODAL PARA EDITAR ---
   const handleEdit = (cond: Condominio) => {
     const config = cond.theme_config || {}
     const cadastro = config.cadastro || {}
@@ -202,7 +229,7 @@ export default function CondominioManagement() {
       logoUrl: branding.logoUrl || '',
       
       totalUnits: structure.totalUnits?.toString() || '',
-      blocks: Array.isArray(structure.blocks) ? structure.blocks.join(', ') : '',
+      blocks: Array.isArray(structure.blocks) ? structure.blocks : [], // Carrega o array direto
       
       modules: {
         faq: modules.faq ?? true,
@@ -213,11 +240,11 @@ export default function CondominioManagement() {
       }
     })
     
+    setNewBlockInput('')
     setEditingId(cond.id)
     setIsModalOpen(true)
   }
 
-  // --- AÇÃO: ACESSAR (Link para Login) ---
   const handleAccess = (slug: string) => {
     const url = `/login?slug=${slug}`
     window.open(url, '_blank')
@@ -228,12 +255,6 @@ export default function CondominioManagement() {
     const toastId = toast.loading(editingId ? 'Atualizando...' : 'Criando condomínio...')
 
     try {
-      // Processa blocos: remove espaços extras e itens vazios
-      const processedBlocks = formData.blocks
-        .split(',')
-        .map(b => b.trim())
-        .filter(Boolean)
-
       const themeConfig = {
         colors: {
           primary: formData.primaryColor,
@@ -245,7 +266,7 @@ export default function CondominioManagement() {
         modules: formData.modules,
         structure: {
           totalUnits: parseInt(formData.totalUnits) || 0,
-          blocks: processedBlocks
+          blocks: formData.blocks // Array de strings
         },
         cadastro: {
           cnpj: formData.cnpj,
@@ -290,7 +311,6 @@ export default function CondominioManagement() {
       setFormData(INITIAL_FORM)
       setEditingId(null)
       
-      // Recarrega lista
       loadCondominios()
 
     } catch (error: any) {
@@ -429,7 +449,6 @@ export default function CondominioManagement() {
                 <input type="text" className="w-full px-3 py-2 border rounded-lg text-sm bg-white" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
               </div>
               
-              {/* PLUS CODE */}
               <div className="col-span-2 bg-white p-3 rounded-lg border border-gray-200">
                 <label className="block text-xs font-bold text-gray-600 mb-1 flex items-center gap-1">
                   Google Plus Code 
@@ -484,28 +503,60 @@ export default function CondominioManagement() {
             </div>
           </div>
 
-          {/* SECTION 3: ESTRUTURA & MÓDULOS (ATUALIZADA) */}
+          {/* SECTION 3: ESTRUTURA & MÓDULOS */}
           <div>
             <h4 className="font-bold text-gray-900 text-sm mb-3">3. Configuração</h4>
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 gap-4 mb-4">
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1">Total Unidades</label>
                 <input type="number" className="w-full px-3 py-2 border rounded-lg text-sm" value={formData.totalUnits} onChange={e => setFormData({...formData, totalUnits: e.target.value})} />
               </div>
+              
+              {/* GERENCIADOR DE BLOCOS / RUAS */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Blocos / Ruas</label>
-                <input 
+                <label className="block text-xs font-bold text-gray-600 mb-1">Cadastro de Blocos / Ruas</label>
+                <div className="flex gap-2 mb-2">
+                  <input 
                     type="text" 
-                    className="w-full px-3 py-2 border rounded-lg text-sm" 
-                    placeholder="Ex: Bloco A, Bloco B, Rua 1" 
-                    value={formData.blocks} 
-                    onChange={e => setFormData({...formData, blocks: e.target.value})} 
-                />
-                <p className="text-[10px] text-gray-400 mt-1">Separe por vírgulas. Usado no cadastro de moradores.</p>
+                    className="flex-1 px-3 py-2 border rounded-lg text-sm" 
+                    placeholder="Ex: Bloco A ou Rua 1" 
+                    value={newBlockInput}
+                    onChange={e => setNewBlockInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleAddBlock(e) }}
+                  />
+                  <button 
+                    type="button" 
+                    onClick={handleAddBlock}
+                    className="bg-blue-600 text-white text-xs font-bold px-4 rounded-lg hover:bg-blue-700 transition"
+                  >
+                    Adicionar
+                  </button>
+                </div>
+                
+                {/* LISTA DE BLOCOS ADICIONADOS */}
+                {formData.blocks.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                        {formData.blocks.map((block, index) => (
+                            <div key={index} className="flex items-center gap-1 bg-white border border-gray-300 text-gray-700 px-2 py-1 rounded text-xs font-medium shadow-sm">
+                                <span>{block}</span>
+                                <button 
+                                    type="button"
+                                    onClick={() => handleRemoveBlock(block)}
+                                    className="text-red-400 hover:text-red-600 ml-1 font-bold"
+                                    title="Remover"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-xs text-gray-400 italic">Nenhum bloco ou rua cadastrado.</p>
+                )}
               </div>
             </div>
             
-            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 mt-4">
               <p className="text-xs font-bold text-gray-500 uppercase mb-2">Módulos Ativos</p>
               <div className="grid grid-cols-2 gap-2">
                 {Object.keys(formData.modules).map((key) => (
