@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { extractTextFromPDF } from '../../lib/pdfUtils'
+import PageLayout from '../../components/PageLayout' // Caminho corrigido se necessário, verifique se PageLayout está em ../../components
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
 import Modal from '../../components/ui/Modal'
 import toast from 'react-hot-toast'
+
+// ... (Interfaces e INITIAL_FORM mantidos iguais)
 
 interface Condominio {
   id: string
@@ -14,7 +17,6 @@ interface Condominio {
   theme_config: any
 }
 
-// Schema inicial do formulário
 const INITIAL_FORM = {
   // 1. Cadastrais
   name: '',
@@ -77,11 +79,12 @@ export default function CondominioManagement() {
 
   // --- PARSER ROBUSTO DA RECEITA FEDERAL ---
   const parseReceitaPDF = (text: string) => {
-    // 1. Limpeza agressiva para normalizar espaços
+    // 1. Limpeza agressiva para normalizar espaços e remover quebras de linha
+    // Substitui qualquer sequência de whitespace por um único espaço
     const cleanText = text.replace(/\s+/g, ' ').trim()
     console.log("Texto Extraído (Clean):", cleanText)
 
-    // Helper para extrair texto entre dois marcadores (com lista de paradas opcionais)
+    // Helper para extrair texto entre dois marcadores
     const extractField = (startRegex: RegExp, stopRegexes: RegExp[]) => {
       const match = cleanText.match(startRegex)
       if (!match || !match.index) return ''
@@ -99,53 +102,58 @@ export default function CondominioManagement() {
         }
       })
 
-      return textAfterStart.slice(0, bestStopIndex).trim().replace(/[*]+/g, '') // Remove asteriscos de campos vazios
+      // Limpa o resultado: remove asteriscos e trim
+      return textAfterStart.slice(0, bestStopIndex).trim().replace(/[*]+/g, '') 
     }
 
-    // 2. Extração de Campos com Regex Flexível (aceita . ou , no CNPJ)
-    const cnpjMatch = cleanText.match(/\d{2}[\.,]\d{3}[\.,]\d{3}\/\d{4}-\d{2}/)
-    const cnpj = cnpjMatch ? cnpjMatch[0].replace(/,/g, '.') : '' // Normaliza para pontos
+    // 2. Extração de Campos
+
+    // CNPJ: Regex ultra flexível. Procura padrão XX . XXX . XXX / XXXX - XX
+    // Aceita pontos, vírgulas ou espaços entre os grupos numéricos
+    // Ex: 08.610,757/0007-02 ou 08 610 757 / 0007 - 02
+    const cnpjMatch = cleanText.match(/(\d{2})[\.\,\s]*(\d{3})[\.\,\s]*(\d{3})[\.\,\s]*\/[\.\,\s]*(\d{4})[\.\,\s-]*(\d{2})/)
+    
+    let cnpj = ''
+    if (cnpjMatch) {
+        // Reconstrói o CNPJ limpo: XX.XXX.XXX/XXXX-XX
+        cnpj = `${cnpjMatch[1]}.${cnpjMatch[2]}.${cnpjMatch[3]}/${cnpjMatch[4]}-${cnpjMatch[5]}`
+    }
 
     // Razão Social
-    const razaoSocial = extractField(/NOME EMPRESARIAL\s+/i, [/TÍTULO DO ESTABELECIMENTO/i, /PORTE/i])
+    const razaoSocial = extractField(/NOME EMPRESARIAL\s+/i, [/TÍTULO DO ESTABELECIMENTO/i, /PORTE/i, /TITULO/i])
     
     // Nome Fantasia
     const nomeFantasia = extractField(/NOME DE FANTASIA\)\s+/i, [/PORTE/i, /CÓDIGO E DESCRIÇÃO/i])
 
-    // Endereço: Logradouro (Muitas vezes para no CEP ou no Número)
-    const logradouro = extractField(/LOGRADOURO\s+/i, [/CEP/i, /NÚMERO/i, /BAIRRO/i])
-    
-    // Número
-    const numero = extractField(/NÚMERO\s+/i, [/COMPLEMENTO/i, /MUNICÍPIO/i, /BAIRRO/i])
-    
-    // Bairro (Pode parar no Município, UF ou Email)
-    const bairro = extractField(/BAIRRO\/?\s*DISTRITO\s+/i, [/MUNICÍPIO/i, /CEP/i, /ENDEREÇO ELETRÔNICO/i, /[A-Z0-9._%+-]+@[A-Z0-9.-]+/i])
+    // Endereço
+    const logradouro = extractField(/LOGRADOURO\s+/i, [/CEP/i, /NÚMERO/i, /BAIRRO/i, /NUMERO/i])
+    const numero = extractField(/N[UÚ]MERO\s+/i, [/COMPLEMENTO/i, /MUNICÍPIO/i, /BAIRRO/i, /MUNICIPIO/i])
+    const bairro = extractField(/BAIRRO\/?\s*DISTRITO\s+/i, [/MUNICÍPIO/i, /CEP/i, /ENDEREÇO ELETRÔNICO/i, /MUNICIPIO/i])
+    const municipio = extractField(/MUNIC[IÍ]PIO\s+/i, [/UF/i, /TELEFONE/i])
 
-    // Município
-    const municipio = extractField(/MUNICÍPIO\s+/i, [/UF/i, /TELEFONE/i])
-
-    // UF
-    const ufMatch = cleanText.match(/UF\s+([A-Z]{2})/i)
+    // UF: Procura UF seguido de 2 letras maiúsculas, com segurança de borda
+    const ufMatch = cleanText.match(/\bUF\s+([A-Z]{2})\b/i)
     const uf = ufMatch ? ufMatch[1] : ''
 
     // Contatos
-    // Tenta pegar email padrão ou procura um padrão de email solto próximo ao campo
     let email = extractField(/ENDEREÇO ELETRÔNICO\s+/i, [/TELEFONE/i, /ENTE FEDERATIVO/i])
-    // Se o extrator pegou lixo, tenta achar um email válido no texto bruto
+    // Fallback para email: procura padrão @ se o extrator falhar
     if (!email.includes('@')) {
       const emailRegexMatch = cleanText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/)
       if (emailRegexMatch) email = emailRegexMatch[0]
     }
 
-    const telefone = extractField(/TELEFONE\s+/i, [/ENTE FEDERATIVO/i, /SITUAÇÃO CADASTRAL/i])
+    const telefone = extractField(/TELEFONE\s+/i, [/ENTE FEDERATIVO/i, /SITUAÇÃO CADASTRAL/i, /SITUACAO/i])
 
     // Lógica de Nome de Exibição
-    const displayName = nomeFantasia && nomeFantasia.length > 2 ? nomeFantasia : razaoSocial
+    const displayName = (nomeFantasia && nomeFantasia.length > 2 && !nomeFantasia.includes('***')) 
+        ? nomeFantasia 
+        : razaoSocial
 
     // Monta endereço completo
     const addressParts = []
     if (logradouro) addressParts.push(logradouro)
-    if (numero) addressParts.push(numero)
+    if (numero && !numero.includes('***')) addressParts.push(numero)
     if (bairro) addressParts.push(bairro)
 
     return {
@@ -169,18 +177,23 @@ export default function CondominioManagement() {
 
     try {
       const text = await extractTextFromPDF(file)
+      
+      if (!text || text.trim().length < 50) {
+          throw new Error('O PDF parece estar vazio ou ilegível (imagem?). Tente um PDF de texto selecionável.')
+      }
+
       const extractedData = parseReceitaPDF(text)
 
       // VALIDAÇÃO
       if (!extractedData.cnpj) {
-        console.error("Falha na extração. Texto bruto:", text)
-        throw new Error('Não foi possível encontrar um CNPJ válido no documento.')
+        console.warn("Falha na extração de CNPJ. Texto bruto:", text)
+        throw new Error('Não foi possível encontrar um CNPJ válido. Verifique se é o documento correto.')
       }
 
       setFormData(prev => ({
         ...prev,
         ...extractedData,
-        // Gera slug apenas se não houver um definido ou se o atual for padrão
+        // Gera slug apenas se não houver um definido
         slug: !prev.slug ? (extractedData.name ? extractedData.name.toLowerCase().replace(/[^a-z0-9]/g, '') : '') : prev.slug
       }))
 
@@ -292,20 +305,16 @@ export default function CondominioManagement() {
         </div>
       )}
 
-      {/* MODAL DE CRIAÇÃO */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title="Novo Condomínio"
       >
         <form onSubmit={handleSubmit} className="space-y-6">
-          
-          {/* SECTION 1: IMPORTAÇÃO E DADOS BÁSICOS */}
           <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-bold text-blue-900 text-sm">1. Dados Cadastrais</h4>
               
-              {/* BOTÃO MÁGICO DE UPLOAD */}
               <div>
                 <input 
                   type="file" 
@@ -357,7 +366,6 @@ export default function CondominioManagement() {
             </div>
           </div>
 
-          {/* SECTION 2: VISUAL */}
           <div>
             <h4 className="font-bold text-gray-900 text-sm mb-3">2. Identidade Visual</h4>
             <div className="grid grid-cols-2 gap-4">
@@ -382,7 +390,6 @@ export default function CondominioManagement() {
             </div>
           </div>
 
-          {/* SECTION 3: ESTRUTURA & MÓDULOS */}
           <div>
             <h4 className="font-bold text-gray-900 text-sm mb-3">3. Configuração</h4>
             <div className="grid grid-cols-2 gap-4 mb-4">

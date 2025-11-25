@@ -1,8 +1,6 @@
 import * as pdfjsLib from 'pdfjs-dist'
 
-// Configuração do Worker usando UNPKG com versão fixa para estabilidade.
-// A versão deve bater com a instalada no package.json (5.4.394)
-// Alterado para usar a URL correta do unpkg que corresponde à versão instalada
+// Configuração do Worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
 
 export async function extractTextFromPDF(file: File): Promise<string> {
@@ -17,6 +15,9 @@ export async function extractTextFromPDF(file: File): Promise<string> {
       const textContent = await page.getTextContent()
       
       // Junta os fragmentos de texto da página
+      // Adicionamos um espaço para garantir que palavras não colem, 
+      // mas o ideal seria usar a geometria (transform) para saber se é nova linha.
+      // Para este caso simples, ' ' costuma bastar.
       const pageText = textContent.items
         .map((item: any) => item.str)
         .join(' ')
@@ -24,9 +25,15 @@ export async function extractTextFromPDF(file: File): Promise<string> {
       fullText += `\n--- Página ${i} ---\n${pageText}`
     }
 
+    console.log(`PDF lido: ${pdf.numPages} páginas. Tamanho texto: ${fullText.length}`)
+    
+    if (fullText.trim().length < 50) {
+        console.warn("Texto extraído muito curto. Possível PDF de imagem.")
+    }
+
     return fullText
   } catch (error) {
     console.error('Erro ao ler PDF:', error)
-    throw new Error('Não foi possível extrair o texto do PDF. Verifique se o arquivo é válido.')
+    throw new Error('Não foi possível extrair o texto do PDF. Verifique se o arquivo é válido e contém texto selecionável (não imagem).')
   }
 }
