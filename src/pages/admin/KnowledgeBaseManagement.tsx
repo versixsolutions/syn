@@ -15,7 +15,8 @@ interface Documento {
     category?: string
     source?: string
     url?: string
-    is_chunk?: boolean // Importante para distinguir chunks
+    is_chunk?: boolean
+    parent_id?: number
   }
   embedding?: any 
 }
@@ -24,7 +25,7 @@ export default function KnowledgeBaseManagement() {
   const [documents, setDocuments] = useState<Documento[]>([])
   const [loading, setLoading] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [docToDelete, setDocToDelete] = useState<Documento | null>(null) // Para delete individual
+  const [docToDelete, setDocToDelete] = useState<Documento | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   
   // Estados para Seleção Múltipla
@@ -38,6 +39,7 @@ export default function KnowledgeBaseManagement() {
   async function loadDocuments() {
     setLoading(true)
     try {
+      // Busca documentos ordenados por data de criação
       const { data, error } = await supabase
         .from('documents')
         .select('id, title, content, created_at, metadata, embedding') 
@@ -45,7 +47,7 @@ export default function KnowledgeBaseManagement() {
 
       if (error) throw error
       setDocuments(data || [])
-      setSelectedIds(new Set()) // Limpa seleção ao recarregar
+      setSelectedIds(new Set())
     } catch (error: any) {
       console.error('Erro ao carregar documentos:', error)
       toast.error('Erro ao carregar base de conhecimento.')
@@ -54,8 +56,39 @@ export default function KnowledgeBaseManagement() {
     }
   }
 
-  // --- LÓGICA DE SELEÇÃO ---
+  // --- LÓGICA DE REPROCESSAMENTO MANUAL ---
+  const handleReprocess = async (doc: Documento) => {
+      const toastId = toast.loading('Reprocessando IA...');
+      try {
+        // Chama a Edge Function para gerar embedding (agora via Gemini 768)
+        const { data, error } = await supabase.functions.invoke('ask-ai', {
+            body: { action: 'embed', text: doc.content }
+        });
 
+        if (error) throw error;
+
+        if (!data || !data.embedding) {
+            throw new Error("A IA não retornou o vetor corretamente.");
+        }
+
+        // Salva o embedding no banco
+        const { error: updateError } = await supabase
+            .from('documents')
+            .update({ embedding: data.embedding })
+            .eq('id', doc.id);
+        
+        if (updateError) throw updateError;
+        
+        // Atualiza lista local visualmente
+        setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, embedding: data.embedding } : d));
+        toast.success('IA Atualizada!', { id: toastId });
+      } catch (err: any) {
+        console.error(err);
+        toast.error('Falha ao reprocessar: ' + (err.message || 'Erro desconhecido'), { id: toastId });
+      }
+  }
+
+  // --- LÓGICA DE SELEÇÃO ---
   const toggleSelectAll = () => {
     if (selectedIds.size === filteredDocs.length && filteredDocs.length > 0) {
       setSelectedIds(new Set())
@@ -76,28 +109,19 @@ export default function KnowledgeBaseManagement() {
   }
 
   // --- LÓGICA DE EXCLUSÃO ---
-
-  // Função auxiliar para apagar um documento (usada tanto no individual quanto no em massa)
   const deleteDocument = async (doc: Documento) => {
-      // 1. Tenta excluir do Storage se for um documento pai (tem URL) e não um chunk
+      // 1. Tenta excluir do Storage se for um documento pai (tem URL)
       if (doc.metadata?.url && !doc.metadata.is_chunk) {
         const pathRegex = /biblioteca\/(.*)/;
         const match = doc.metadata.url.match(pathRegex);
         
         if (match && match[1]) {
              const storagePath = match[1];
-             // Ignora erro de storage (pode já ter sido apagado manualmente)
              await supabase.storage.from('biblioteca').remove([storagePath])
         }
       }
 
-      // 2. Excluir do Banco de Dados (Isso apaga o registro)
-      // Se for um documento pai, idealmente deveríamos apagar os filhos (chunks) também.
-      // Como não temos FK estrita de parent_id em todos os casos antigos, vamos confiar que o delete
-      // apaga o registro pelo ID.
-      // Melhoria: Se o documento tiver filhos (chunks) vinculados via parent_id, o Supabase
-      // deveria apagar em cascata se configurado, ou podemos fazer uma query extra.
-      // Para simplificar no frontend: Apagamos o ID específico.
+      // 2. Excluir do Banco de Dados
       const { error } = await supabase.from('documents').delete().eq('id', doc.id)
       if (error) throw error
   }
@@ -124,13 +148,9 @@ export default function KnowledgeBaseManagement() {
     const toastId = toast.loading(`Excluindo ${selectedIds.size} itens...`)
     
     try {
-      // Filtra os objetos completos baseados nos IDs selecionados
       const docsToDelete = documents.filter(d => selectedIds.has(d.id))
-      
-      // Executa as exclusões em paralelo (ou em lotes se fossem muitos, mas para <100 é ok)
       await Promise.all(docsToDelete.map(doc => deleteDocument(doc)))
       
-      // Atualiza a lista local
       setDocuments(prev => prev.filter(d => !selectedIds.has(d.id)))
       setSelectedIds(new Set())
       setIsMassDeleteModalOpen(false)
@@ -159,7 +179,6 @@ export default function KnowledgeBaseManagement() {
         </div>
         
         <div className="flex items-center gap-3 w-full md:w-auto">
-            {/* Botão de Exclusão em Massa */}
             {selectedIds.size > 0 && (
                 <button 
                     onClick={() => setIsMassDeleteModalOpen(true)}
@@ -170,7 +189,6 @@ export default function KnowledgeBaseManagement() {
                 </button>
             )}
 
-            {/* Barra de Busca */}
             <div className="relative flex-1 md:w-64">
                 <input 
                     type="text" 
@@ -245,9 +263,17 @@ export default function KnowledgeBaseManagement() {
                     </td>
                     <td className="px-4 py-4 text-center">
                         {doc.embedding ? (
-                            <span className="inline-flex w-2 h-2 rounded-full bg-green-500" title="Processado"></span>
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200" title="Processado com sucesso">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> Ativo
+                            </span>
                         ) : (
-                            <span className="inline-flex w-2 h-2 rounded-full bg-orange-400" title="Pendente"></span>
+                            <button 
+                                onClick={() => handleReprocess(doc)}
+                                className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded border border-orange-200 hover:bg-orange-100 transition cursor-pointer" 
+                                title="Clique para reprocessar a IA deste documento"
+                            >
+                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span> Pendente ↻
+                            </button>
                         )}
                     </td>
                     <td className="px-4 py-4 text-right">

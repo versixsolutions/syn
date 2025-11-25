@@ -5,12 +5,7 @@ import { extractTextFromPDF } from '../lib/pdfUtils'
 import PageLayout from '../components/PageLayout'
 import LoadingSpinner from '../components/LoadingSpinner'
 import EmptyState from '../components/EmptyState'
-import { pipeline, env } from '@xenova/transformers'
 import toast from 'react-hot-toast'
-
-// Configuração da IA
-env.allowLocalModels = false;
-env.useBrowserCache = true;
 
 const CATEGORIAS_DOCS = [
   { id: 'atas', label: 'Atas de Assembleia', icon: '📝', color: 'bg-blue-100 text-blue-700' },
@@ -45,38 +40,29 @@ function sanitizeFileName(name: string) {
     .toLowerCase()
 }
 
-// --- FUNÇÃO DE FRAGMENTAÇÃO OTIMIZADA ---
-function splitTextIntoChunks(text: string, docTitle: string): string[] {
-  // 1. Limpeza Pesada: Remove cabeçalhos/rodapés de página repetitivos
-  let cleanText = text
-    .replace(/--- PAGE \d+ ---/g, '') // Remove marcador de página do extrator
-    .replace(/REGIMENTO INTERNO\s+PINHEIRO PARK/gi, '') // Remove título repetitivo (exemplo)
-    .replace(/\s+/g, ' ') // Normaliza espaços e quebras de linha
+// Função de fragmentação para exibição e processamento
+function splitTextIntoChunks(text: string): string[] {
+  // Remove cabeçalhos de página e normaliza espaços
+  const cleanText = text
+    .replace(/--- P[áa]gina \d+ ---/gi, '')
+    .replace(/\s+/g, ' ')
     .trim();
 
-  // 2. Regex melhorada para Artigos, Capítulos e Cláusulas
-  // Captura o divisor mas mantém ele no texto (lookahead)
-  const splitRegex = /(?=(?:CAPÍTULO|TITULO|SEÇÃO|Artigo|Art\.|CLÁUSULA)\s+[\dIVX]+)/i;
+  // Regex para identificar inícios de Artigos ou Capítulos
+  const splitRegex = /(?=\s*(?:Artigo|Art\.|CAPÍTULO|SEÇÃO|CLÁUSULA)\s+[\dIVX]+)/i;
   
   const rawChunks = cleanText.split(splitRegex);
   
-  // 3. Processamento dos Chunks
+  // Filtra chunks e limpa
   const chunks = rawChunks
     .map(c => c.trim())
-    .filter(c => c.length > 30) // Remove fragmentos muito curtos (ruídos)
-    .map(c => {
-        // ADICIONA CONTEXTO: Prepend o título do documento em cada fragmento
-        // Isso ajuda a IA a saber que "Artigo 5" pertence ao "Regimento Interno"
-        return `Documento: ${docTitle}. ${c}`;
-    });
+    .filter(c => c.length > 50); 
 
-  // Fallback para textos sem estrutura clara
+  // Fallback para textos sem estrutura
   if (chunks.length <= 1) {
     const fixedSizeChunks = [];
-    // Blocos menores (500 chars) para precisão
-    for (let i = 0; i < cleanText.length; i += 500) {
-      // Adiciona contexto também no fallback
-      fixedSizeChunks.push(`Documento: ${docTitle}. ${cleanText.slice(i, i + 500)}`);
+    for (let i = 0; i < cleanText.length; i += 600) {
+      fixedSizeChunks.push(cleanText.slice(i, i + 600));
     }
     return fixedSizeChunks;
   }
@@ -109,7 +95,7 @@ export default function Biblioteca() {
         .from('documents')
         .select('*')
         .eq('condominio_id', profile?.condominio_id)
-        .is('metadata->>is_chunk', null) 
+        .is('metadata->>is_chunk', null) // Traz apenas documentos pai
         .order('id', { ascending: false })
 
       if (error) throw error
@@ -137,13 +123,13 @@ export default function Biblioteca() {
 
     try {
       const categoryLabel = CATEGORIAS_DOCS.find(c => c.id === uploadCategory)?.label || 'Documento'
-      const docTitle = selectedFile.name.replace('.pdf', '');
-
+      const docTitle = selectedFile.name.replace('.pdf', '')
+      
       toast.loading('Lendo conteúdo do PDF...', { id: toastId })
       const textContent = await extractTextFromPDF(selectedFile)
       
       if (!textContent || textContent.length < 50) {
-        throw new Error('O PDF parece vazio ou ilegível.')
+        throw new Error('O PDF parece vazio ou é uma imagem ilegível.')
       }
 
       toast.loading('Enviando arquivo...', { id: toastId })
@@ -160,14 +146,7 @@ export default function Biblioteca() {
         .from('biblioteca')
         .getPublicUrl(fileName)
 
-      toast.loading('A Norma está indexando os tópicos...', { id: toastId })
-      const generateEmbedding = await pipeline('feature-extraction', 'Supabase/gte-small');
-      
-      // CHUNKING OTIMIZADO
-      const chunks = splitTextIntoChunks(textContent, docTitle);
-      console.log(`Gerados ${chunks.length} fragmentos com contexto.`);
-
-      // Documento Pai
+      // Inserir Documento Pai (sem embedding, apenas leitura humana)
       const parentDoc = {
         title: docTitle,
         content: textContent,
@@ -188,24 +167,38 @@ export default function Biblioteca() {
         .single()
 
       if (parentError) throw parentError
-      
-      // Processamento dos Chunks
-      const chunkSize = 5;
+
+      // Processamento dos Chunks (Inteligência)
+      toast.loading('A Norma está lendo e indexando...', { id: toastId })
+      const chunks = splitTextIntoChunks(textContent);
+      console.log(`Gerados ${chunks.length} fragmentos.`);
+
+      const chunkSize = 3; // Lote pequeno para não estourar timeout
       let processed = 0;
 
       for (let i = 0; i < chunks.length; i += chunkSize) {
         const batch = chunks.slice(i, i + chunkSize);
+        
+        // Processa embeddings em paralelo
         const promises = batch.map(async (chunkText) => {
-           const output = await generateEmbedding(chunkText, { pooling: 'mean', normalize: true });
-           const embedding = Array.from(output.data);
+           // Chama a Edge Function para gerar embedding (Gemini)
+           // Adiciona contexto do título ao texto do chunk
+           const contextChunk = `Documento: ${docTitle}. ${chunkText}`;
            
-           // Remove o prefixo de contexto "Documento: ..." para a exibição no banco se quiser economizar espaço, 
-           // mas é melhor manter para consistência se for ler depois.
-           // Vamos salvar o texto COMPLETO (com contexto) para garantir.
+           const { data: embedData, error: embedError } = await supabase.functions.invoke('ask-ai', {
+             body: { action: 'embed', text: contextChunk }
+           })
+           
+           if (embedError) {
+               console.error("Erro no embedding:", embedError);
+               return null; // Ignora falhas individuais para não travar tudo
+           }
+           
+           const embedding = embedData.embedding;
            
            return {
              title: `${docTitle} (Trecho)`,
-             content: chunkText, // Conteúdo com contexto embutido
+             content: contextChunk,
              embedding: embedding,
              tags: `chunk ia_context ${uploadCategory}`,
              condominio_id: profile.condominio_id,
@@ -218,25 +211,29 @@ export default function Biblioteca() {
            }
         });
 
-        await Promise.all(promises);
-        const records = await Promise.all(promises);
-        const { error: chunkError } = await supabase.from('documents').insert(records);
-        if(chunkError) console.error(chunkError);
+        const results = await Promise.all(promises);
+        const validRecords = results.filter(r => r !== null);
+        
+        if (validRecords.length > 0) {
+            const { error: chunkError } = await supabase.from('documents').insert(validRecords);
+            if(chunkError) console.error(chunkError);
+        }
         
         processed += batch.length;
-        toast.loading(`Indexando: ${processed}/${chunks.length} tópicos...`, { id: toastId });
+        toast.loading(`Indexando: ${Math.min(processed, chunks.length)}/${chunks.length} partes...`, { id: toastId });
       }
 
+      // Comunicado
       await supabase.from('comunicados').insert({
         title: `Novo Documento: ${docTitle}`,
-        content: `Um novo arquivo foi adicionado à Biblioteca Digital na categoria **${categoryLabel}**. \n\nA Norma aprendeu ${chunks.length} novos tópicos deste documento.`,
+        content: `Um novo arquivo foi adicionado à Biblioteca Digital na categoria **${categoryLabel}**. \n\nA Norma já leu e está pronta para tirar dúvidas sobre ele.`,
         type: 'informativo', 
         priority: 1,
         author_id: user?.id,
         condominio_id: profile?.condominio_id
       })
 
-      toast.success('Documento indexado com sucesso!', { id: toastId })
+      toast.success('Documento salvo e aprendido!', { id: toastId })
       setIsModalOpen(false)
       setSelectedFile(null)
       loadDocs()
@@ -249,6 +246,7 @@ export default function Biblioteca() {
     }
   }
 
+  // ... (Filtros e renderização)
   const filteredDocs = docs.filter(d => {
     const matchesSearch = d.content.toLowerCase().includes(searchTerm.toLowerCase()) || d.title.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesCategory = selectedFilter ? d.metadata?.category === selectedFilter : true
@@ -257,13 +255,6 @@ export default function Biblioteca() {
 
   const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) setSelectedFile(e.target.files[0])
-  }
-
-  // Helper para resumo visual (para o documento Pai)
-  const getSummary = (text: string) => {
-     // Tenta limpar o cabeçalho de página repetitivo antes de resumir
-     const clean = text.replace(/--- PAGE \d+ ---/g, '').replace(/\s+/g, ' ').trim();
-     return clean.slice(0, 150) + '...'
   }
 
   if (loading) return <LoadingSpinner message="Carregando biblioteca..." />
@@ -291,9 +282,8 @@ export default function Biblioteca() {
             const category = CATEGORIAS_DOCS.find(c => c.id === doc.metadata?.category) || CATEGORIAS_DOCS[6]
             const isExpanded = expandedDocs.has(doc.id)
             
-            // Para visualização, usamos o documento completo, mas processado
-            // Usamos a função de split SEM o título injetado para ficar bonito na tela
-            const rawChunks = splitTextIntoChunks(doc.content, '').slice(0, 5);
+            // Gera visualização de tópicos no frontend
+            const rawChunks = splitTextIntoChunks(doc.content).slice(0, 5);
             
             return (
               <div key={doc.id} className={`bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-primary transition-all duration-300 group relative overflow-hidden ${isExpanded ? 'ring-2 ring-primary ring-opacity-50' : ''}`}>
@@ -320,7 +310,8 @@ export default function Biblioteca() {
                       <p className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wide">Principais Tópicos:</p>
                       <div className="space-y-2">
                         {rawChunks.map((topic, index) => {
-                          const topicClean = topic.replace(/^Documento:.*?\.\s*/, ''); // Remove o contexto visualmente
+                          // Limpeza visual para o resumo
+                          const topicClean = topic.replace(/^Documento:.*?\.\s*/, ''); 
                           const topicTitle = topicClean.split('\n')[0].slice(0, 80);
                           return (
                             <div key={index} className="flex items-start gap-2 text-sm text-gray-700 bg-gray-50 p-2 rounded border border-gray-100">
