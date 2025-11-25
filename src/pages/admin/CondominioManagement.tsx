@@ -25,8 +25,8 @@ const INITIAL_FORM = {
   email: '',
   phone: '',
   
-  // 1.1 Localização (Atualizado para Plus Code)
-  plusCode: '', // Ex: 87Q3+22, Teresina - PI
+  // 1.1 Localização
+  plusCode: '', 
   
   // 2. Identidade Visual
   primaryColor: '#1F4080',
@@ -51,6 +51,7 @@ export default function CondominioManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSearchingCnpj, setIsSearchingCnpj] = useState(false)
   const [formData, setFormData] = useState(INITIAL_FORM)
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   useEffect(() => {
     loadCondominios()
@@ -74,36 +75,6 @@ export default function CondominioManagement() {
     }
   }
 
-  // Helper para buscar Plus Code via Nominatim (OpenStreetMap)
-  // O Nominatim nem sempre retorna o Plus Code diretamente, então usamos uma lógica simples:
-  // Se acharmos Lat/Lon, convertemos (em um cenário real, usaríamos a lib `open-location-code`,
-  // mas aqui vamos manter simples buscando o link do Google Maps que gera o Plus Code).
-  
-  // Workaround para MVP: Vamos buscar Lat/Lon e deixar o link do Google Maps gerar o Plus Code visualmente
-  // ou pedir para o usuário colar o Plus Code do Google Maps se o automático falhar.
-  
-  const fetchLocationData = async (fullAddress: string) => {
-    try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}&limit=1`)
-      const data = await response.json()
-      
-      // Nota: Nominatim não retorna Plus Code nativamente.
-      // Para MVP, se acharmos coordenadas, vamos tentar "simular" ou deixar em branco para preenchimento manual.
-      // O Google Maps API seria ideal aqui, mas é pago.
-      
-      if (data && data.length > 0) {
-        // Retornamos null no Plus Code para incentivar o preenchimento manual preciso,
-        // ou poderíamos usar uma lib JS para converter Lat/Lon -> Plus Code.
-        // Vamos focar na UX de pedir o código.
-        return null 
-      }
-    } catch (e) {
-      console.warn('Erro ao buscar localização:', e)
-    }
-    return null
-  }
-
-  // --- BUSCA CNPJ VIA BRASILAPI ---
   const handleCnpjSearch = async () => {
     const cleanCnpj = formData.cnpj.replace(/\D/g, '')
     
@@ -145,11 +116,9 @@ export default function CondominioManagement() {
         email: data.email || '',
         phone: data.ddd_telefone_1 || '',
         slug: !prev.slug ? suggestedSlug : prev.slug,
-        // Plus Code geralmente precisa ser pego manualmente no Maps para precisão
-        plusCode: '' 
       }))
 
-      toast.success('Dados preenchidos! Insira o Plus Code manualmente para precisão.', { id: toastId })
+      toast.success('Dados preenchidos! Verifique o Plus Code manualmente.', { id: toastId })
 
     } catch (error: any) {
       console.error(error)
@@ -159,9 +128,65 @@ export default function CondominioManagement() {
     }
   }
 
+  // --- AÇÃO: ABRIR MODAL PARA NOVO ---
+  const handleOpenNew = () => {
+    setFormData(INITIAL_FORM)
+    setEditingId(null)
+    setIsModalOpen(true)
+  }
+
+  // --- AÇÃO: ABRIR MODAL PARA EDITAR ---
+  const handleEdit = (cond: Condominio) => {
+    const config = cond.theme_config || {}
+    const cadastro = config.cadastro || {}
+    const contact = cadastro.contact || {}
+    const location = cadastro.location || {}
+    const colors = config.colors || {}
+    const branding = config.branding || {}
+    const structure = config.structure || {}
+    const modules = config.modules || {}
+
+    setFormData({
+      name: cond.name,
+      slug: cond.slug,
+      razaoSocial: cadastro.razaoSocial || '',
+      cnpj: cadastro.cnpj || '',
+      address: cadastro.address || '',
+      city: cadastro.city || '',
+      state: cadastro.state || '',
+      email: contact.email || '',
+      phone: contact.phone || '',
+      plusCode: location.plusCode || '',
+      
+      primaryColor: colors.primary || '#1F4080',
+      secondaryColor: colors.secondary || '#00A86B',
+      logoUrl: branding.logoUrl || '',
+      
+      totalUnits: structure.totalUnits?.toString() || '',
+      blocks: Array.isArray(structure.blocks) ? structure.blocks.join(', ') : '',
+      modules: {
+        faq: modules.faq ?? true,
+        reservas: modules.reservas ?? false,
+        ocorrencias: modules.ocorrencias ?? true,
+        votacoes: modules.votacoes ?? true,
+        financeiro: modules.financeiro ?? true
+      }
+    })
+    
+    setEditingId(cond.id)
+    setIsModalOpen(true)
+  }
+
+  // --- AÇÃO: ACESSAR (Link para Login) ---
+  const handleAccess = (slug: string) => {
+    // Abre o login com o slug preenchido (simulação de acesso direto)
+    const url = `/login?slug=${slug}`
+    window.open(url, '_blank')
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const toastId = toast.loading('Criando condomínio...')
+    const toastId = toast.loading(editingId ? 'Atualizando...' : 'Criando condomínio...')
 
     try {
       const themeConfig = {
@@ -188,26 +213,43 @@ export default function CondominioManagement() {
             phone: formData.phone
           },
           location: {
-            plusCode: formData.plusCode // Salva o Plus Code
+            plusCode: formData.plusCode
           }
         }
       }
 
-      const { error } = await supabase.from('condominios').insert({
-        name: formData.name,
-        slug: formData.slug,
-        theme_config: themeConfig
-      })
+      if (editingId) {
+        // UPDATE
+        const { error } = await supabase
+          .from('condominios')
+          .update({
+            name: formData.name,
+            slug: formData.slug,
+            theme_config: themeConfig
+          })
+          .eq('id', editingId)
 
-      if (error) throw error
+        if (error) throw error
+        toast.success('Condomínio atualizado!', { id: toastId })
+      } else {
+        // INSERT
+        const { error } = await supabase.from('condominios').insert({
+          name: formData.name,
+          slug: formData.slug,
+          theme_config: themeConfig
+        })
 
-      toast.success('Condomínio criado com sucesso!', { id: toastId })
+        if (error) throw error
+        toast.success('Condomínio criado com sucesso!', { id: toastId })
+      }
+
       setIsModalOpen(false)
       setFormData(INITIAL_FORM)
+      setEditingId(null)
       loadCondominios()
 
     } catch (error: any) {
-      toast.error('Erro ao criar: ' + error.message, { id: toastId })
+      toast.error('Erro: ' + error.message, { id: toastId })
     }
   }
 
@@ -219,7 +261,7 @@ export default function CondominioManagement() {
           <p className="text-gray-500 text-sm">Gerencie os clientes e tenants do sistema.</p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleOpenNew}
           className="bg-primary text-white px-4 py-2 rounded-lg font-bold shadow-md hover:bg-primary-dark transition flex items-center gap-2"
         >
           <span>+</span> Novo Condomínio
@@ -261,10 +303,16 @@ export default function CondominioManagement() {
               )}
               
               <div className="flex gap-2 border-t border-gray-100 pt-3">
-                <button className="flex-1 text-xs font-bold text-gray-600 hover:bg-gray-50 py-2 rounded">
+                <button 
+                  onClick={() => handleEdit(cond)}
+                  className="flex-1 text-xs font-bold text-gray-600 hover:bg-gray-50 py-2 rounded transition"
+                >
                   Editar
                 </button>
-                <button className="flex-1 text-xs font-bold text-blue-600 hover:bg-blue-50 py-2 rounded">
+                <button 
+                  onClick={() => handleAccess(cond.slug)}
+                  className="flex-1 text-xs font-bold text-blue-600 hover:bg-blue-50 py-2 rounded transition"
+                >
                   Acessar
                 </button>
               </div>
@@ -273,15 +321,15 @@ export default function CondominioManagement() {
         </div>
       )}
 
-      {/* MODAL DE CRIAÇÃO */}
+      {/* MODAL DE CRIAÇÃO/EDIÇÃO */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Novo Condomínio"
+        title={editingId ? "Editar Condomínio" : "Novo Condomínio"}
       >
         <form onSubmit={handleSubmit} className="space-y-6">
           
-          {/* SECTION 1: DADOS BÁSICOS VIA API */}
+          {/* SECTION 1: DADOS BÁSICOS */}
           <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-bold text-blue-900 text-sm">1. Dados Cadastrais</h4>
@@ -333,7 +381,7 @@ export default function CondominioManagement() {
                 <input type="text" className="w-full px-3 py-2 border rounded-lg text-sm bg-white" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
               </div>
               
-              {/* PLUS CODE (Substituindo Lat/Lon) */}
+              {/* PLUS CODE */}
               <div className="col-span-2 bg-white p-3 rounded-lg border border-gray-200">
                 <label className="block text-xs font-bold text-gray-600 mb-1 flex items-center gap-1">
                   Google Plus Code 
@@ -359,7 +407,6 @@ export default function CondominioManagement() {
                     </a>
                   )}
                 </div>
-                <p className="text-[10px] text-gray-400 mt-1">Código curto do Google Maps para localização exata da portaria.</p>
               </div>
             </div>
           </div>
@@ -389,7 +436,7 @@ export default function CondominioManagement() {
             </div>
           </div>
 
-          {/* SECTION 3: ESTRUTURA & MÓDULOS */}
+          {/* SECTION 3: ESTRUTURA */}
           <div>
             <h4 className="font-bold text-gray-900 text-sm mb-3">3. Configuração</h4>
             <div className="grid grid-cols-2 gap-4 mb-4">
@@ -426,7 +473,7 @@ export default function CondominioManagement() {
 
           <div className="pt-2 border-t border-gray-100 flex gap-3">
             <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-50">Cancelar</button>
-            <button type="submit" className="flex-1 py-2.5 bg-primary text-white font-bold rounded-lg hover:bg-primary-dark shadow-lg">Criar Condomínio</button>
+            <button type="submit" className="flex-1 py-2.5 bg-primary text-white font-bold rounded-lg hover:bg-primary-dark shadow-lg">{editingId ? 'Salvar' : 'Criar Condomínio'}</button>
           </div>
         </form>
       </Modal>
