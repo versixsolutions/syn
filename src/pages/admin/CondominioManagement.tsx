@@ -68,7 +68,7 @@ const INITIAL_FORM = {
   secondaryColor: '#00A86B',
   logoUrl: '',
   
-  // 3. Estrutura (Agora é um array de strings)
+  // 3. Estrutura
   totalUnits: '',
   blocks: [] as string[], 
   
@@ -90,8 +90,10 @@ export default function CondominioManagement() {
   const [formData, setFormData] = useState(INITIAL_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
   
-  // Estado local para o input de novo bloco
+  // Estados para o CRUD de Blocos
   const [newBlockInput, setNewBlockInput] = useState('')
+  const [editingBlockIndex, setEditingBlockIndex] = useState<number | null>(null)
+  const blockInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     loadCondominios()
@@ -115,29 +117,73 @@ export default function CondominioManagement() {
     }
   }
 
-  // --- MANIPULAÇÃO DA LISTA DE BLOCOS ---
-  const handleAddBlock = (e?: React.FormEvent) => {
-    if (e) e.preventDefault() // Previne submit do form se apertar enter
+  // --- CRUD DE BLOCOS / RUAS ---
+  
+  const handleAddOrUpdateBlock = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     
     const val = newBlockInput.trim()
     if (!val) return
 
-    if (formData.blocks.includes(val)) {
-      toast.error('Este bloco/rua já foi adicionado.')
-      return
+    // MODO EDIÇÃO (UPDATE)
+    if (editingBlockIndex !== null) {
+      // Verifica duplicidade (excluindo o próprio item que está sendo editado)
+      if (formData.blocks.some((b, idx) => b.toLowerCase() === val.toLowerCase() && idx !== editingBlockIndex)) {
+        toast.error('Este nome já existe na lista.')
+        return
+      }
+
+      setFormData(prev => {
+        const newBlocks = [...prev.blocks]
+        newBlocks[editingBlockIndex] = val
+        return { ...prev, blocks: newBlocks }
+      })
+      
+      toast.success('Item atualizado!')
+      setEditingBlockIndex(null)
+    } 
+    // MODO CRIAÇÃO (CREATE)
+    else {
+      if (formData.blocks.some(b => b.toLowerCase() === val.toLowerCase())) {
+        toast.error('Este bloco/rua já foi adicionado.')
+        return
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        blocks: [...prev.blocks, val]
+      }))
+      toast.success('Adicionado!')
+    }
+
+    setNewBlockInput('')
+    // Mantém o foco no input para digitação rápida
+    setTimeout(() => blockInputRef.current?.focus(), 0)
+  }
+
+  const handleEditBlock = (index: number) => {
+    setNewBlockInput(formData.blocks[index])
+    setEditingBlockIndex(index)
+    blockInputRef.current?.focus()
+  }
+
+  const handleCancelEditBlock = () => {
+    setNewBlockInput('')
+    setEditingBlockIndex(null)
+  }
+
+  const handleRemoveBlock = (indexToRemove: number) => {
+    // Se estiver editando o item que vai ser removido, cancela a edição
+    if (editingBlockIndex === indexToRemove) {
+        handleCancelEditBlock()
+    } else if (editingBlockIndex !== null && indexToRemove < editingBlockIndex) {
+        // Ajusta o índice se remover um item anterior ao que está sendo editado
+        setEditingBlockIndex(editingBlockIndex - 1)
     }
 
     setFormData(prev => ({
       ...prev,
-      blocks: [...prev.blocks, val]
-    }))
-    setNewBlockInput('')
-  }
-
-  const handleRemoveBlock = (blockToRemove: string) => {
-    setFormData(prev => ({
-      ...prev,
-      blocks: prev.blocks.filter(b => b !== blockToRemove)
+      blocks: prev.blocks.filter((_, index) => index !== indexToRemove)
     }))
   }
 
@@ -198,6 +244,7 @@ export default function CondominioManagement() {
   const handleOpenNew = () => {
     setFormData(INITIAL_FORM)
     setNewBlockInput('')
+    setEditingBlockIndex(null)
     setEditingId(null)
     setIsModalOpen(true)
   }
@@ -229,7 +276,7 @@ export default function CondominioManagement() {
       logoUrl: branding.logoUrl || '',
       
       totalUnits: structure.totalUnits?.toString() || '',
-      blocks: Array.isArray(structure.blocks) ? structure.blocks : [], // Carrega o array direto
+      blocks: Array.isArray(structure.blocks) ? structure.blocks : [], 
       
       modules: {
         faq: modules.faq ?? true,
@@ -241,6 +288,7 @@ export default function CondominioManagement() {
     })
     
     setNewBlockInput('')
+    setEditingBlockIndex(null)
     setEditingId(cond.id)
     setIsModalOpen(true)
   }
@@ -512,46 +560,83 @@ export default function CondominioManagement() {
                 <input type="number" className="w-full px-3 py-2 border rounded-lg text-sm" value={formData.totalUnits} onChange={e => setFormData({...formData, totalUnits: e.target.value})} />
               </div>
               
-              {/* GERENCIADOR DE BLOCOS / RUAS */}
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Cadastro de Blocos / Ruas</label>
-                <div className="flex gap-2 mb-2">
+              {/* GERENCIADOR CRUD DE BLOCOS / RUAS */}
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <label className="block text-xs font-bold text-gray-600 mb-2">Cadastro de Blocos / Ruas</label>
+                
+                {/* FORMULÁRIO DE ADIÇÃO/EDIÇÃO */}
+                <div className="flex gap-2 mb-3">
                   <input 
+                    ref={blockInputRef}
                     type="text" 
-                    className="flex-1 px-3 py-2 border rounded-lg text-sm" 
+                    className={`flex-1 px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 ${editingBlockIndex !== null ? 'border-blue-400 bg-blue-50' : 'border-gray-300'}`}
                     placeholder="Ex: Bloco A ou Rua 1" 
                     value={newBlockInput}
                     onChange={e => setNewBlockInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') handleAddBlock(e) }}
+                    onKeyDown={e => { if (e.key === 'Enter') handleAddOrUpdateBlock(e) }}
                   />
                   <button 
                     type="button" 
-                    onClick={handleAddBlock}
-                    className="bg-blue-600 text-white text-xs font-bold px-4 rounded-lg hover:bg-blue-700 transition"
+                    onClick={handleAddOrUpdateBlock}
+                    disabled={!newBlockInput.trim()}
+                    className={`text-white text-xs font-bold px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed
+                      ${editingBlockIndex !== null ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}
+                    `}
                   >
-                    Adicionar
+                    {editingBlockIndex !== null ? 'Atualizar' : 'Adicionar'}
                   </button>
+                  
+                  {editingBlockIndex !== null && (
+                    <button 
+                      type="button"
+                      onClick={handleCancelEditBlock}
+                      className="bg-gray-200 text-gray-600 text-xs font-bold px-3 rounded-lg hover:bg-gray-300 transition"
+                    >
+                      Cancelar
+                    </button>
+                  )}
                 </div>
                 
-                {/* LISTA DE BLOCOS ADICIONADOS */}
+                {/* LISTA DE ITENS */}
                 {formData.blocks.length > 0 ? (
-                    <div className="flex flex-wrap gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <div className="flex flex-wrap gap-2">
                         {formData.blocks.map((block, index) => (
-                            <div key={index} className="flex items-center gap-1 bg-white border border-gray-300 text-gray-700 px-2 py-1 rounded text-xs font-medium shadow-sm">
-                                <span>{block}</span>
-                                <button 
-                                    type="button"
-                                    onClick={() => handleRemoveBlock(block)}
-                                    className="text-red-400 hover:text-red-600 ml-1 font-bold"
-                                    title="Remover"
-                                >
-                                    ×
-                                </button>
+                            <div 
+                              key={index} 
+                              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border transition group
+                                ${editingBlockIndex === index ? 'bg-blue-100 border-blue-300 text-blue-800 ring-1 ring-blue-300' : 'bg-white border-gray-300 text-gray-700 hover:border-blue-300'}
+                              `}
+                            >
+                                <span className="cursor-default">{block}</span>
+                                
+                                <div className="flex items-center border-l border-gray-300 pl-2 ml-1 gap-1 opacity-60 group-hover:opacity-100 transition">
+                                  {/* Botão Editar */}
+                                  <button 
+                                      type="button"
+                                      onClick={() => handleEditBlock(index)}
+                                      className="text-blue-500 hover:text-blue-700 p-0.5 rounded hover:bg-blue-50"
+                                      title="Editar"
+                                  >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                  </button>
+                                  
+                                  {/* Botão Remover */}
+                                  <button 
+                                      type="button"
+                                      onClick={() => handleRemoveBlock(index)}
+                                      className="text-red-400 hover:text-red-600 p-0.5 rounded hover:bg-red-50"
+                                      title="Remover"
+                                  >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                  </button>
+                                </div>
                             </div>
                         ))}
                     </div>
                 ) : (
-                    <p className="text-xs text-gray-400 italic">Nenhum bloco ou rua cadastrado.</p>
+                    <div className="text-center py-4 border-2 border-dashed border-gray-200 rounded-lg">
+                      <p className="text-xs text-gray-400 italic">Nenhum bloco ou rua cadastrado.</p>
+                    </div>
                 )}
               </div>
             </div>
