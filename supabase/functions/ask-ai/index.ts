@@ -1,121 +1,99 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from 'std/http/server.ts'
+import { pipeline, env } from '@xenova/transformers'
+
+// Configuração IA Local
+env.useBrowserCache = false;
+env.allowLocalModels = false;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Configuração do Gemini
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-const GEMINI_EMBED_URL = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`;
-const GEMINI_CHAT_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
+const QDRANT_URL = Deno.env.get('QDRANT_URL');
+const QDRANT_API_KEY = Deno.env.get('QDRANT_API_KEY');
+const COLLECTION_NAME = "norma_knowledge_base";
 
 serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const { action, text, query, userName, filter_condominio_id } = await req.json()
+    const { query, userName, filter_condominio_id } = await req.json()
+
+    if (!GROQ_API_KEY || !QDRANT_URL) throw new Error("Configurações de API ausentes.");
+
+    // 1. Gerar Embedding da Pergunta
+    const extractor = await pipeline('feature-extraction', 'Supabase/gte-small');
+    const output = await extractor(query, { pooling: 'mean', normalize: true });
+    const queryVector = Array.from(output.data);
+
+    // 2. Buscar no Qdrant (Com filtro de condomínio)
+    const searchPayload = {
+        vector: queryVector,
+        limit: 5,
+        with_payload: true,
+        filter: {
+            must: [
+                { key: "condominio_id", match: { value: filter_condominio_id } }
+            ]
+        }
+    };
+
+    const searchResp = await fetch(`${QDRANT_URL}/collections/${COLLECTION_NAME}/points/search`, {
+        method: 'POST',
+        headers: { 'api-key': QDRANT_API_KEY!, 'Content-Type': 'application/json' },
+        body: JSON.stringify(searchPayload)
+    });
+
+    const searchData = await searchResp.json();
+    const hits = searchData.result || [];
+
+    // 3. Montar Contexto
+    const contextText = hits.map((hit: any) => hit.payload.content).join("\n\n---\n\n");
     
-    if (!GEMINI_API_KEY) throw new Error("API Key do Gemini não configurada.");
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const supabase = createClient(supabaseUrl!, supabaseKey!);
-
-    // --- AÇÃO 1: GERAR EMBEDDING (Para salvar documentos) ---
-    if (action === 'embed') {
-        const response = await fetch(GEMINI_EMBED_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: "models/text-embedding-004",
-                content: { parts: [{ text: text }] }
-            })
-        });
-        const data = await response.json();
-        
-        if (!data.embedding) {
-            console.error("Erro Gemini Embed:", data);
-            throw new Error("Falha ao gerar vetor.");
-        }
-
-        const embedding = data.embedding.values;
-        return new Response(JSON.stringify({ embedding }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (!contextText) {
+        return new Response(JSON.stringify({ answer: "Não encontrei informações sobre isso nos documentos do seu condomínio." }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // --- AÇÃO 2: RESPONDER PERGUNTA (Chat) ---
-    if (query) {
-        // 1. Gerar vetor da pergunta
-        const embedResponse = await fetch(GEMINI_EMBED_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: "models/text-embedding-004",
-                content: { parts: [{ text: query }] }
-            })
-        });
-        const embedData = await embedResponse.json();
-        const queryEmbedding = embedData.embedding.values;
+    // 4. Raciocínio com Groq (Llama 3)
+    const systemPrompt = `
+      Você é a Norma, gerente predial.
+      Use APENAS o contexto abaixo para responder.
+      Contexto: ${contextText}
+      
+      Pergunta: "${query}"
+      
+      Instruções:
+      - Responda em português do Brasil.
+      - Seja direta e educada.
+      - Cite a fonte se possível.
+      - Se não souber, diga que não consta.
+    `;
 
-        // 2. Buscar documentos similares
-        const { data: documents, error: matchError } = await supabase.rpc('match_documents', {
-            query_embedding: queryEmbedding,
-            match_threshold: 0.5, 
-            match_count: 5,
-            filter_condominio_id: filter_condominio_id
-        });
+    const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${GROQ_API_KEY}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            model: "llama3-8b-8192", // Modelo rápido e gratuito
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: query }
+            ],
+            temperature: 0.1
+        })
+    });
 
-        if (matchError) throw matchError;
+    const groqData = await groqResp.json();
+    const answer = groqData.choices?.[0]?.message?.content || "Erro ao gerar resposta.";
 
-        // 3. Montar Contexto
-        let contextText = "";
-        if (documents && documents.length > 0) {
-            // Removemos "Trecho do documento..." para economizar tokens e limpar o prompt
-            contextText = documents.map((d: any) => d.content).join("\n\n---\n\n");
-        } else {
-            contextText = "";
-        }
-
-        // 4. Perguntar ao Gemini (PROMPT REFINADO)
-        const prompt = `
-          Você é a Norma, assistente virtual inteligente e amigável de um condomínio.
-          Sua missão é ajudar o morador ${userName || ''} respondendo dúvidas sobre o regimento interno e regras.
-
-          CONTEXTO (Trechos dos documentos oficiais):
-          ${contextText}
-
-          PERGUNTA DO MORADOR: 
-          "${query}"
-
-          DIRETRIZES DE RESPOSTA:
-          1. Responda de forma direta e resumida. Não copie e cole o texto do regulamento.
-          2. Use linguagem natural e acolhedora (ex: "O regimento permite...", "De acordo com as regras...").
-          3. Se a resposta estiver no contexto, cite o Artigo ou Capítulo específico entre parênteses no final da frase. Ex: "...é proibido vidro na piscina (Art. 30)".
-          4. Se o contexto NÃO tiver a resposta, diga claramente: "Não encontrei essa informação específica nos documentos que li, mas posso abrir um chamado para o síndico se desejar."
-          5. Não invente regras. Baseie-se apenas no contexto fornecido.
-        `;
-
-        const chatResponse = await fetch(GEMINI_CHAT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }]
-            })
-        });
-
-        const chatData = await chatResponse.json();
-        const answer = chatData.candidates?.[0]?.content?.parts?.[0]?.text || "Desculpe, tive um erro ao processar sua resposta.";
-
-        return new Response(JSON.stringify({ answer }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    throw new Error("Ação inválida.");
+    return new Response(JSON.stringify({ answer }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
-    console.error("Erro na Edge Function:", error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    console.error(error);
+    return new Response(JSON.stringify({ answer: `Erro técnico: ${error.message}` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 })
