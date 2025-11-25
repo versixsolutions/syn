@@ -188,8 +188,10 @@ export const pinheiroParkTheme = {
   },
   
   branding: {
-    logoUrl: '/assets/logos/pinheiro-park.svg',
-    logoWhiteUrl: '/assets/logos/pinheiro-park-white.svg',
+    // CORREÇÃO: Apontar para o arquivo .png existente em vez do .svg inexistente
+    logoUrl: '/assets/logos/pinheiro-park-logo.png', 
+    // Mantendo o white como fallback ou futuro, mas idealmente deve existir também
+    logoWhiteUrl: '/assets/logos/pinheiro-park-white.svg', 
     poweredByUrl: '/assets/logos/condomix-badge.svg',
     favicon: '/favicon-pinheiropark.ico',
     meta: {
