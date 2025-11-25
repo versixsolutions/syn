@@ -6,7 +6,7 @@ import PageLayout from '../components/PageLayout'
 import LoadingSpinner from '../components/LoadingSpinner'
 import EmptyState from '../components/EmptyState'
 
-// ... (CATEGORIAS_DOCS e interfaces mantidas iguais)
+// CONSTANTE GLOBAL (Renomeada para evitar conflitos e padronizar)
 const CATEGORIAS_DOCS = [
   { id: 'atas', label: 'Atas de Assembleia', icon: '📝', color: 'bg-blue-100 text-blue-700' },
   { id: 'regimento', label: 'Regimento Interno', icon: '📜', color: 'bg-purple-100 text-purple-700' },
@@ -41,7 +41,7 @@ function sanitizeFileName(name: string) {
 }
 
 export default function Biblioteca() {
-  const { profile, canManage } = useAuth() // Usando o helper 'canManage' (Admin/Sindico)
+  const { profile, canManage } = useAuth()
   const [docs, setDocs] = useState<Documento[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -73,17 +73,14 @@ export default function Biblioteca() {
   }
 
   const handleUpload = async () => {
-    // Proteção dupla: Frontend (canManage) + Backend (RLS)
     if (!selectedFile || !profile?.condominio_id || !canManage) return
 
     setUploading(true)
     try {
       const categoryLabel = CATEGORIAS_DOCS.find(c => c.id === uploadCategory)?.label || 'Documento'
       
-      // CORREÇÃO: Extrair texto ANTES do upload para garantir que o PDF é legível
       const textContent = await extractTextFromPDF(selectedFile)
       
-      // CORREÇÃO: Sanitizar nome do arquivo para evitar erro "Invalid Key"
       const cleanName = sanitizeFileName(selectedFile.name)
       const fileName = `${profile.condominio_id}/${Date.now()}_${cleanName}`
 
@@ -98,7 +95,7 @@ export default function Biblioteca() {
         .getPublicUrl(fileName)
 
       const { error: dbError } = await supabase.from('documents').insert({
-        title: selectedFile.name.replace('.pdf', ''), // Mantém título original para exibição
+        title: selectedFile.name.replace('.pdf', ''),
         content: textContent,
         tags: `${categoryLabel.toLowerCase()} ${uploadCategory} pdf documento oficial`,
         condominio_id: profile.condominio_id,
@@ -130,7 +127,6 @@ export default function Biblioteca() {
     return matchesSearch && matchesCategory
   })
 
-  // Função auxiliar para input de arquivo
   const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) setSelectedFile(e.target.files[0])
   }
@@ -143,7 +139,6 @@ export default function Biblioteca() {
       subtitle="Acervo de documentos oficiais" 
       icon="📚"
       headerAction={
-        // Apenas quem tem permissão (canManage) vê o botão
         canManage ? (
           <button 
             onClick={() => setIsModalOpen(true)}
@@ -154,7 +149,6 @@ export default function Biblioteca() {
         ) : null
       }
     >
-      {/* Resto do layout (Busca, Filtros, Lista) permanece igual */}
       <div className="mb-6 space-y-4">
         <div className="relative">
           <input type="text" placeholder="Buscar nos documentos..." className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}/>
@@ -162,6 +156,7 @@ export default function Biblioteca() {
         </div>
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
           <button onClick={() => setSelectedFilter(null)} className={`px-4 py-1.5 rounded-full text-xs font-bold border transition shrink-0 ${!selectedFilter ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>Todos</button>
+          {/* CORREÇÃO: Usando CATEGORIAS_DOCS em português consistentemente */}
           {CATEGORIAS_DOCS.map((cat) => (
             <button key={cat.id} onClick={() => setSelectedFilter(cat.id)} className={`px-3 py-1.5 rounded-full text-xs font-bold border transition shrink-0 flex items-center gap-1 ${selectedFilter === cat.id ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 hover:bg-gray-50'}`}><span>{cat.icon}</span> {cat.label}</button>
           ))}
@@ -186,7 +181,6 @@ export default function Biblioteca() {
         </div>
       ) : (<EmptyState icon="📭" title="Nenhum documento" description="A biblioteca está vazia." />)}
 
-      {/* Modal de Upload (Só renderiza se tiver permissão) */}
       {canManage && isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
@@ -196,7 +190,8 @@ export default function Biblioteca() {
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">Categoria</label>
                   <div className="grid grid-cols-2 gap-2">
-                    {CATEGORIES_DOCS.map((cat) => (
+                    {/* CORREÇÃO: Usando CATEGORIAS_DOCS aqui também */}
+                    {CATEGORIAS_DOCS.map((cat) => (
                       <button key={cat.id} onClick={() => setUploadCategory(cat.id)} className={`text-xs font-semibold py-2 px-3 rounded-lg border text-left flex items-center gap-2 transition ${uploadCategory === cat.id ? `${cat.color} border-current ring-1 ring-current` : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}><span>{cat.icon}</span> {cat.label}</button>
                     ))}
                   </div>
