@@ -6,10 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Configuração do Gemini
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-const GEMINI_EMBED_URL = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`;
-const GEMINI_CHAT_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -19,7 +17,7 @@ serve(async (req: Request) => {
   try {
     const { action, text, query, userName, filter_condominio_id } = await req.json()
     
-    if (!GEMINI_API_KEY) throw new Error("API Key do Gemini não configurada.");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY não configurada nos Secrets.");
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -27,7 +25,7 @@ serve(async (req: Request) => {
 
     // --- AÇÃO 1: GERAR EMBEDDING (Para salvar documentos) ---
     if (action === 'embed') {
-        const response = await fetch(GEMINI_EMBED_URL, {
+        const response = await fetch(`${API_BASE}/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -35,16 +33,23 @@ serve(async (req: Request) => {
                 content: { parts: [{ text: text }] }
             })
         });
+
+        if (!response.ok) {
+            const err = await response.text();
+            console.error("Erro Gemini Embed:", err);
+            throw new Error(`Falha ao gerar embedding: ${err}`);
+        }
+
         const data = await response.json();
-        const embedding = data.embedding.values;
-        
-        return new Response(JSON.stringify({ embedding }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ embedding: data.embedding.values }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // --- AÇÃO 2: RESPONDER PERGUNTA (Chat) ---
     if (query) {
+        console.log(`Pergunta recebida: ${query}`);
+
         // 1. Gerar vetor da pergunta
-        const embedResponse = await fetch(GEMINI_EMBED_URL, {
+        const embedResponse = await fetch(`${API_BASE}/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -52,46 +57,56 @@ serve(async (req: Request) => {
                 content: { parts: [{ text: query }] }
             })
         });
+
+        if (!embedResponse.ok) throw new Error("Erro ao vetorizar pergunta no Gemini.");
+        
         const embedData = await embedResponse.json();
         const queryEmbedding = embedData.embedding.values;
 
-        // 2. Buscar documentos similares no Supabase
-        // Nota: O modelo do Gemini tem 768 dimensões. Precisamos ajustar a tabela 'documents' se ela ainda for 384.
-        // Vou assumir que você rodará o SQL de migração para 768.
+        // 2. Buscar documentos no Supabase
+        // Reduzi o threshold para 0.3 para garantir que ele encontre algo mesmo se a similaridade não for perfeita
         const { data: documents, error: matchError } = await supabase.rpc('match_documents', {
             query_embedding: queryEmbedding,
-            match_threshold: 0.5, // Gemini embeddings podem ter escalas diferentes, ajustável
+            match_threshold: 0.3, 
             match_count: 5,
             filter_condominio_id: filter_condominio_id
         });
 
-        if (matchError) throw matchError;
+        if (matchError) {
+            console.error("Erro no Banco:", matchError);
+            throw matchError;
+        }
 
-        // 3. Montar Contexto para o Gemini
+        console.log(`Documentos encontrados: ${documents?.length || 0}`);
+
+        // 3. Montar Contexto
         let contextText = "";
         if (documents && documents.length > 0) {
-            contextText = documents.map((d: any) => `[Trecho do documento '${d.metadata?.source || 'Oficial'}']: ${d.content}`).join("\n\n");
+            contextText = documents.map((d: any) => `--- Trecho de '${d.metadata?.source || 'Documento'}' ---\n${d.content}`).join("\n\n");
         } else {
-            contextText = "Não foram encontrados documentos específicos sobre este tema na base de conhecimento.";
+            // Se não achar nada, instrui a IA a ser cordial
+            contextText = "Nenhum documento específico foi encontrado no banco de dados sobre este tópico.";
         }
 
         // 4. Perguntar ao Gemini
         const prompt = `
-          Você é a Norma, assistente virtual do condomínio.
-          Responda à pergunta do morador ${userName || ''} com base APENAS no contexto abaixo.
+          Você é a Norma, assistente virtual oficial do condomínio.
           
-          Contexto:
+          CONTEXTO DOS DOCUMENTOS OFICIAIS:
           ${contextText}
 
-          Pergunta do morador: "${query}"
+          PERGUNTA DO MORADOR (${userName || 'Morador'}): 
+          "${query}"
 
-          Instruções:
-          - Seja educada e direta.
-          - Se a resposta estiver no contexto, cite a fonte (ex: "Segundo o Artigo X...").
-          - Se a resposta NÃO estiver no contexto, diga que não encontrou a informação nos documentos oficiais, mas não invente regras.
+          INSTRUÇÕES:
+          1. Responda baseando-se EXCLUSIVAMENTE no contexto fornecido acima.
+          2. Se a resposta estiver no contexto, seja direta e cite a fonte (ex: "Conforme o Artigo X...").
+          3. Se o contexto não tiver a resposta ou for insuficiente, diga educadamente: "Desculpe, não encontrei essa informação específica nos documentos oficiais do condomínio. Recomendo verificar com a administração."
+          4. Não invente regras que não estejam no texto.
+          5. Seja simpática e profissional.
         `;
 
-        const chatResponse = await fetch(GEMINI_CHAT_URL, {
+        const chatResponse = await fetch(`${API_BASE}/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -99,8 +114,19 @@ serve(async (req: Request) => {
             })
         });
 
+        if (!chatResponse.ok) {
+            const errText = await chatResponse.text();
+            console.error("Erro Gemini Chat:", errText);
+            throw new Error("O Google Gemini recusou a resposta.");
+        }
+
         const chatData = await chatResponse.json();
-        const answer = chatData.candidates?.[0]?.content?.parts?.[0]?.text || "Desculpe, tive um erro ao processar sua resposta.";
+        const answer = chatData.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!answer) {
+            console.error("Gemini retornou estrutura inválida:", JSON.stringify(chatData));
+            throw new Error("A IA não gerou uma resposta de texto válida.");
+        }
 
         return new Response(JSON.stringify({ answer }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -108,7 +134,7 @@ serve(async (req: Request) => {
     throw new Error("Ação inválida.");
 
   } catch (error: any) {
-    console.error("Erro na Edge Function:", error);
+    console.error("Erro Geral:", error.message);
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })
