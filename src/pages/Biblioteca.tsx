@@ -5,6 +5,12 @@ import { extractTextFromPDF } from '../lib/pdfUtils'
 import PageLayout from '../components/PageLayout'
 import LoadingSpinner from '../components/LoadingSpinner'
 import EmptyState from '../components/EmptyState'
+import { pipeline, env } from '@xenova/transformers' // Importação da IA
+import toast from 'react-hot-toast' // UX melhorada
+
+// Configuração da IA para não tentar buscar modelos locais no navegador
+env.allowLocalModels = false;
+env.useBrowserCache = true; // Mantém o modelo em cache para ser rápido nas próximas vezes
 
 // CONSTANTE GLOBAL
 const CATEGORIAS_DOCS = [
@@ -47,7 +53,6 @@ export default function Biblioteca() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null)
   
-  // Estado para controlar quais documentos estão expandidos (Set de IDs)
   const [expandedDocs, setExpandedDocs] = useState<Set<number>>(new Set())
   
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -86,15 +91,38 @@ export default function Biblioteca() {
     })
   }
 
+  // --- FUNÇÃO DE UPLOAD INTELIGENTE ---
   const handleUpload = async () => {
     if (!selectedFile || !profile?.condominio_id || !canManage || !user) return
 
     setUploading(true)
+    const toastId = toast.loading('Iniciando processamento...')
+
     try {
       const categoryLabel = CATEGORIAS_DOCS.find(c => c.id === uploadCategory)?.label || 'Documento'
       
+      // 1. Extração de Texto (OCR / PDF Parse)
+      toast.loading('Lendo conteúdo do PDF...', { id: toastId })
       const textContent = await extractTextFromPDF(selectedFile)
       
+      if (!textContent || textContent.length < 50) {
+        throw new Error('O PDF parece vazio ou é uma imagem sem texto. A IA não conseguirá ler.')
+      }
+
+      // 2. Geração de Embedding (IA Local) - O PASSO MÁGICO
+      toast.loading('A Norma está estudando o documento... (Isso pode levar alguns segundos)', { id: toastId })
+      
+      // Carrega o modelo no navegador (na 1ª vez baixa uns 30MB, nas próximas é instantâneo pelo cache)
+      const generateEmbedding = await pipeline('feature-extraction', 'Supabase/gte-small');
+      
+      // Gera o vetor matemático do texto
+      const output = await generateEmbedding(textContent, { pooling: 'mean', normalize: true });
+      const embedding = Array.from(output.data);
+
+      console.log(`Embedding gerado com sucesso! Dimensões: ${embedding.length}`)
+
+      // 3. Upload do Arquivo
+      toast.loading('Enviando para a nuvem...', { id: toastId })
       const cleanName = sanitizeFileName(selectedFile.name)
       const fileName = `${profile.condominio_id}/${Date.now()}_${cleanName}`
 
@@ -108,9 +136,11 @@ export default function Biblioteca() {
         .from('biblioteca')
         .getPublicUrl(fileName)
 
+      // 4. Salvar no Banco com o Vetor de IA
       const { error: dbError } = await supabase.from('documents').insert({
         title: selectedFile.name.replace('.pdf', ''),
         content: textContent,
+        embedding: embedding, // <--- AQUI ESTÁ A MÁGICA: Salvamos o cérebro junto com o corpo
         tags: `${categoryLabel.toLowerCase()} ${uploadCategory} pdf documento oficial`,
         condominio_id: profile.condominio_id,
         metadata: {
@@ -123,10 +153,10 @@ export default function Biblioteca() {
 
       if (dbError) throw dbError
 
-      // LÓGICA DE COMUNICADO AUTOMÁTICO
+      // 5. Comunicado Automático
       const { error: comunicError } = await supabase.from('comunicados').insert({
         title: `Novo Documento: ${selectedFile.name.replace('.pdf', '')}`,
-        content: `Um novo arquivo foi adicionado à Biblioteca Digital na categoria **${categoryLabel}**.`,
+        content: `Um novo arquivo foi adicionado à Biblioteca Digital na categoria **${categoryLabel}**. \n\nA Norma já leu e está pronta para tirar dúvidas sobre ele.`,
         type: 'informativo', 
         priority: 1,
         author_id: user?.id,
@@ -135,13 +165,14 @@ export default function Biblioteca() {
 
       if (comunicError) console.error("Erro ao criar comunicado:", comunicError)
 
-      alert('Documento salvo e publicado no mural!')
+      toast.success('Documento salvo e aprendido pela Norma!', { id: toastId })
       setIsModalOpen(false)
       setSelectedFile(null)
       loadDocs()
 
     } catch (error: any) {
-      alert('Erro: ' + error.message)
+      console.error(error)
+      toast.error('Erro: ' + (error.message || 'Falha no processamento'), { id: toastId })
     } finally {
       setUploading(false)
     }
@@ -194,15 +225,13 @@ export default function Biblioteca() {
             const category = CATEGORIAS_DOCS.find(c => c.id === doc.metadata?.category) || CATEGORIAS_DOCS[6]
             const isExpanded = expandedDocs.has(doc.id)
             
-            // Resumo mais limpo e curto
-            // Remove caracteres de controle estranhos e espaços múltiplos
+            // Resumo limpo
             const cleanContent = doc.content.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
             const summary = cleanContent.slice(0, 140) + (cleanContent.length > 140 ? '...' : '')
 
             return (
               <div key={doc.id} className={`bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:border-primary transition group relative overflow-hidden ${isExpanded ? 'ring-2 ring-primary ring-opacity-50' : ''}`}>
                 
-                {/* Header do Card */}
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex items-center gap-2">
                     <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${category.color}`}>
@@ -213,15 +242,11 @@ export default function Biblioteca() {
 
                 <h3 className="text-lg font-bold text-gray-900 mb-3 line-clamp-1">{doc.title || doc.metadata?.title}</h3>
                 
-                {/* Área de Conteúdo */}
                 <div className={`relative transition-all duration-300`}>
-                  
                   {isExpanded ? (
-                    // Conteúdo Expandido (Texto maior + Link)
                     <div className="animate-fade-in">
                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 mb-4">
                          <p className="text-sm text-gray-700 leading-relaxed font-sans whitespace-pre-line">
-                           {/* Mostra um trecho generoso mas não o PDF inteiro em texto para não poluir */}
                            {doc.content.slice(0, 2000)}
                            {doc.content.length > 2000 && <span className="text-gray-400 italic block mt-2">(...continuar lendo no PDF original)</span>}
                          </p>
@@ -240,16 +265,13 @@ export default function Biblioteca() {
                        )}
                     </div>
                   ) : (
-                    // Resumo (Estado Recolhido) - Visual mais limpo
                     <div className="text-sm text-gray-500 mb-2">
                       <span className="font-medium text-gray-700">Resumo: </span>
                       {summary}
                     </div>
                   )}
-
                 </div>
 
-                {/* Botão de Toggle */}
                 <button 
                   onClick={() => toggleExpand(doc.id)}
                   className="w-full py-2 mt-2 text-xs font-bold text-primary uppercase tracking-wider border border-primary/20 rounded-lg hover:bg-primary/5 transition flex items-center justify-center gap-2"
@@ -257,7 +279,7 @@ export default function Biblioteca() {
                   {isExpanded ? (
                     <>Recolher <svg className="w-3 h-3 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg></>
                   ) : (
-                    <>Ler Mais & Acessar PDF <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg></>
+                    <>Leia Mais & Acessar PDF <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg></>
                   )}
                 </button>
 
@@ -273,6 +295,13 @@ export default function Biblioteca() {
             <div className="p-6">
               <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-gray-900">Adicionar Documento</h3><button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button></div>
               <div className="space-y-4">
+                <div className="bg-purple-50 border border-purple-100 p-3 rounded-lg">
+                  <p className="text-xs text-purple-700 font-medium flex items-start gap-2">
+                    <span className="text-base">🤖</span>
+                    O conteúdo deste PDF será lido automaticamente pela Norma para responder dúvidas dos moradores.
+                  </p>
+                </div>
+
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">Categoria</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -288,7 +317,7 @@ export default function Biblioteca() {
                     {selectedFile ? (<div className="text-green-700"><div className="text-2xl mb-1">📄</div><p className="font-bold text-sm truncate">{selectedFile.name}</p></div>) : (<div className="text-gray-500"><div className="text-2xl mb-1">📤</div><p className="font-medium text-sm">Clique para selecionar PDF</p></div>)}
                   </div>
                 </div>
-                <button onClick={handleUpload} disabled={!selectedFile || uploading} className="w-full bg-primary text-white py-3 rounded-xl font-bold shadow-lg hover:bg-primary-dark transition disabled:opacity-50">{uploading ? 'Processando...' : 'Enviar e Indexar'}</button>
+                <button onClick={handleUpload} disabled={!selectedFile || uploading} className="w-full bg-primary text-white py-3 rounded-xl font-bold shadow-lg hover:bg-primary-dark transition disabled:opacity-50">{uploading ? 'Processando Inteligência...' : 'Enviar e Ensinar Norma'}</button>
               </div>
             </div>
           </div>
