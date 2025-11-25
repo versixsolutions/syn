@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useCondominios } from '../hooks/useCondominios'
@@ -8,14 +8,44 @@ import { ZodError } from 'zod'
 
 const logo = '/assets/logos/versix-solutions-logo.png'
 
+// Componente de Card Selecionável para Titularidade
+const ResidentTypeCard = ({ 
+  type, 
+  label, 
+  icon, 
+  selected, 
+  onClick 
+}: { 
+  type: string, 
+  label: string, 
+  icon: string, 
+  selected: boolean, 
+  onClick: () => void 
+}) => (
+  <div 
+    onClick={onClick}
+    className={`
+      flex flex-col items-center justify-center p-3 rounded-xl border-2 cursor-pointer transition-all duration-200
+      ${selected 
+        ? 'border-primary bg-blue-50/50 text-primary shadow-sm scale-[1.02]' 
+        : 'border-gray-200 bg-white text-gray-500 hover:border-blue-200 hover:bg-gray-50'}
+    `}
+  >
+    <span className="text-2xl mb-1">{icon}</span>
+    <span className="text-xs font-bold uppercase tracking-wide">{label}</span>
+  </div>
+)
+
 export default function Signup() {
   const [formData, setFormData] = useState<SignupFormData>({
     email: '',
     password: '',
-    fullName: '',
+    firstName: '',
+    lastName: '',
     condominioId: '',
     residentType: 'titular',
     unitNumber: '',
+    block: '',
     phone: '',
     isWhatsapp: true
   })
@@ -24,9 +54,21 @@ export default function Signup() {
   const [generalError, setGeneralError] = useState('')
   const [loading, setLoading] = useState(false)
   const [isSignedUp, setIsSignedUp] = useState(false)
+  const [availableBlocks, setAvailableBlocks] = useState<string[]>([])
 
   const { signUp } = useAuth()
   const { condominios, loading: loadingCondominios } = useCondominios()
+
+  // Atualiza blocos disponíveis quando condomínio muda
+  useEffect(() => {
+    if (formData.condominioId) {
+      const selectedCondo = condominios.find(c => c.id === formData.condominioId)
+      const blocksConfig = selectedCondo?.theme_config?.structure?.blocks || []
+      setAvailableBlocks(blocksConfig)
+    } else {
+      setAvailableBlocks([])
+    }
+  }, [formData.condominioId, condominios])
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, '')
@@ -53,16 +95,7 @@ export default function Signup() {
     try {
       const validData = signupSchema.parse(formData)
 
-      await signUp(
-        validData.email, 
-        validData.password, 
-        validData.fullName, 
-        validData.condominioId,
-        validData.phone,
-        validData.unitNumber,
-        validData.residentType,
-        validData.isWhatsapp
-      )
+      await signUp(validData)
       
       setIsSignedUp(true)
 
@@ -104,34 +137,50 @@ export default function Signup() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary to-secondary flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 my-8 animate-fade-in">
+    <div className="min-h-screen bg-gradient-to-br from-primary to-secondary flex items-center justify-center p-4 py-8">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 md:p-8 animate-fade-in my-4">
         <div className="text-center mb-6">
           <img src={logo} alt="Versix" className="w-32 h-auto mx-auto mb-2" />
-          <h1 className="text-2xl font-bold text-gray-900">Meu Condominio</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Meu Condomínio</h1>
           <p className="text-gray-600 text-sm">Crie sua conta de morador</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {generalError && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3">
               <p className="text-red-800 text-sm text-center">{generalError}</p>
             </div>
           )}
 
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Nome Completo</label>
-            <input
-              name="fullName"
-              type="text"
-              value={formData.fullName}
-              onChange={handleChange}
-              placeholder="Seu nome completo"
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none ${fieldErrors.fullName ? 'border-red-500' : 'border-gray-300'}`}
-            />
-            {fieldErrors.fullName && <p className="text-red-500 text-xs mt-1">{fieldErrors.fullName}</p>}
+          {/* 1. Nome e Sobrenome (Grid) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Nome</label>
+              <input
+                name="firstName"
+                type="text"
+                value={formData.firstName}
+                onChange={handleChange}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none ${fieldErrors.firstName ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="João"
+              />
+              {fieldErrors.firstName && <p className="text-red-500 text-[10px] mt-1">{fieldErrors.firstName}</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Sobrenome</label>
+              <input
+                name="lastName"
+                type="text"
+                value={formData.lastName}
+                onChange={handleChange}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none ${fieldErrors.lastName ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Silva"
+              />
+              {fieldErrors.lastName && <p className="text-red-500 text-[10px] mt-1">{fieldErrors.lastName}</p>}
+            </div>
           </div>
 
+          {/* 2. Condomínio */}
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Condomínio</label>
             <select
@@ -151,19 +200,59 @@ export default function Signup() {
             {fieldErrors.condominioId && <p className="text-red-500 text-xs mt-1">{fieldErrors.condominioId}</p>}
           </div>
 
+          {/* 3. Tipo de Morador (Seleção Visual) */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-2 uppercase">Eu sou:</label>
+            <div className="grid grid-cols-3 gap-2">
+              <ResidentTypeCard 
+                type="titular" 
+                label="Titular" 
+                icon="🔑" 
+                selected={formData.residentType === 'titular'}
+                onClick={() => setFormData(p => ({ ...p, residentType: 'titular' }))}
+              />
+              <ResidentTypeCard 
+                type="inquilino" 
+                label="Inquilino" 
+                icon="📄" 
+                selected={formData.residentType === 'inquilino'}
+                onClick={() => setFormData(p => ({ ...p, residentType: 'inquilino' }))}
+              />
+              <ResidentTypeCard 
+                type="morador" 
+                label="Morador" 
+                icon="🏠" 
+                selected={formData.residentType === 'morador'}
+                onClick={() => setFormData(p => ({ ...p, residentType: 'morador' }))}
+              />
+            </div>
+          </div>
+
+          {/* 4. Endereço (Bloco e Unidade) */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Sou</label>
-              <select
-                name="residentType"
-                value={formData.residentType}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white"
-              >
-                <option value="titular">Titular</option>
-                <option value="inquilino">Inquilino</option>
-                <option value="morador">Morador</option>
-              </select>
+              <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Bloco / Rua</label>
+              {availableBlocks.length > 0 ? (
+                <select
+                  name="block"
+                  value={formData.block}
+                  onChange={handleChange}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white ${fieldErrors.block ? 'border-red-500' : 'border-gray-300'}`}
+                >
+                  <option value="">Selecione</option>
+                  {availableBlocks.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              ) : (
+                <input
+                  name="block"
+                  type="text"
+                  value={formData.block}
+                  onChange={handleChange}
+                  placeholder="Bl 01"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none ${fieldErrors.block ? 'border-red-500' : 'border-gray-300'}`}
+                />
+              )}
+              {fieldErrors.block && <p className="text-red-500 text-[10px] mt-1">{fieldErrors.block}</p>}
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Nº Unidade</label>
@@ -173,12 +262,13 @@ export default function Signup() {
                 value={formData.unitNumber}
                 onChange={handleChange}
                 placeholder="Ex: 102"
-                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none ${fieldErrors.unitNumber ? 'border-red-500' : 'border-gray-300'}`}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none ${fieldErrors.unitNumber ? 'border-red-500' : 'border-gray-300'}`}
               />
-              {fieldErrors.unitNumber && <p className="text-red-500 text-xs mt-1">{fieldErrors.unitNumber}</p>}
+              {fieldErrors.unitNumber && <p className="text-red-500 text-[10px] mt-1">{fieldErrors.unitNumber}</p>}
             </div>
           </div>
 
+          {/* 5. Contato */}
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Celular / WhatsApp</label>
             <input
@@ -189,8 +279,6 @@ export default function Signup() {
               placeholder="(99) 99999-9999"
               className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none ${fieldErrors.phone ? 'border-red-500' : 'border-gray-300'}`}
             />
-            {fieldErrors.phone && <p className="text-red-500 text-xs mt-1">{fieldErrors.phone}</p>}
-            
             <label className="flex items-center gap-2 mt-2 cursor-pointer">
               <input 
                 type="checkbox"
@@ -202,6 +290,7 @@ export default function Signup() {
             </label>
           </div>
 
+          {/* 6. Login */}
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1 uppercase">Email</label>
             <input
@@ -209,10 +298,9 @@ export default function Signup() {
               type="email"
               value={formData.email}
               onChange={handleChange}
-              placeholder="seu@email.com"
               className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none ${fieldErrors.email ? 'border-red-500' : 'border-gray-300'}`}
             />
-            {fieldErrors.email && <p className="text-red-500 text-xs mt-1">{fieldErrors.email}</p>}
+            {fieldErrors.email && <p className="text-red-500 text-[10px] mt-1">{fieldErrors.email}</p>}
           </div>
 
           <div>
@@ -222,10 +310,9 @@ export default function Signup() {
               type="password"
               value={formData.password}
               onChange={handleChange}
-              placeholder="••••••••"
               className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none ${fieldErrors.password ? 'border-red-500' : 'border-gray-300'}`}
             />
-            {fieldErrors.password && <p className="text-red-500 text-xs mt-1">{fieldErrors.password}</p>}
+            {fieldErrors.password && <p className="text-red-500 text-[10px] mt-1">{fieldErrors.password}</p>}
           </div>
 
           <button
@@ -233,7 +320,7 @@ export default function Signup() {
             disabled={loading || loadingCondominios}
             className="w-full bg-gradient-to-r from-primary to-secondary text-white py-3 rounded-lg font-bold hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed mt-4"
           >
-            {loading ? 'Processando...' : 'Criar Conta'}
+            {loading ? 'Criando Conta...' : 'Criar Conta'}
           </button>
         </form>
 

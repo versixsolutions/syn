@@ -5,14 +5,49 @@ import EmptyState from '../../components/EmptyState'
 import Modal from '../../components/ui/Modal'
 import toast from 'react-hot-toast'
 
+// Interface completa do Condomínio
 interface Condominio {
   id: string
   name: string
   slug: string
   created_at: string
-  theme_config: any
+  theme_config: {
+    colors: {
+      primary: string
+      secondary: string
+    }
+    branding: {
+      logoUrl: string
+    }
+    modules: {
+      faq: boolean
+      reservas: boolean
+      ocorrencias: boolean
+      votacoes: boolean
+      financeiro: boolean
+    }
+    structure: {
+      totalUnits: number
+      blocks: string[] // Lista de Blocos/Ruas
+    }
+    cadastro: {
+      cnpj: string
+      razaoSocial: string
+      address: string
+      city: string
+      state: string
+      contact: {
+        email: string
+        phone: string
+      }
+      location: {
+        plusCode: string
+      }
+    }
+  }
 }
 
+// Estado inicial do formulário
 const INITIAL_FORM = {
   // 1. Cadastrais
   name: '',
@@ -35,7 +70,9 @@ const INITIAL_FORM = {
   
   // 3. Estrutura
   totalUnits: '',
-  blocks: '', 
+  blocks: '', // Input de texto separado por vírgulas
+  
+  // 4. Módulos
   modules: {
     faq: true,
     reservas: false,
@@ -75,6 +112,7 @@ export default function CondominioManagement() {
     }
   }
 
+  // --- BUSCA CNPJ VIA BRASILAPI ---
   const handleCnpjSearch = async () => {
     const cleanCnpj = formData.cnpj.replace(/\D/g, '')
     
@@ -101,6 +139,7 @@ export default function CondominioManagement() {
       const addressFull = `${addressSimple}, ${data.bairro}, ${data.municipio} - ${data.uf}`
       const displayName = data.nome_fantasia || data.razao_social
       
+      // Gera slug sugerido
       const suggestedSlug = displayName
         .toLowerCase()
         .normalize('NFD').replace(/[\u0300-\u036f]/g, "")
@@ -164,6 +203,7 @@ export default function CondominioManagement() {
       
       totalUnits: structure.totalUnits?.toString() || '',
       blocks: Array.isArray(structure.blocks) ? structure.blocks.join(', ') : '',
+      
       modules: {
         faq: modules.faq ?? true,
         reservas: modules.reservas ?? false,
@@ -179,7 +219,6 @@ export default function CondominioManagement() {
 
   // --- AÇÃO: ACESSAR (Link para Login) ---
   const handleAccess = (slug: string) => {
-    // Abre o login com o slug preenchido (simulação de acesso direto)
     const url = `/login?slug=${slug}`
     window.open(url, '_blank')
   }
@@ -189,6 +228,12 @@ export default function CondominioManagement() {
     const toastId = toast.loading(editingId ? 'Atualizando...' : 'Criando condomínio...')
 
     try {
+      // Processa blocos: remove espaços extras e itens vazios
+      const processedBlocks = formData.blocks
+        .split(',')
+        .map(b => b.trim())
+        .filter(Boolean)
+
       const themeConfig = {
         colors: {
           primary: formData.primaryColor,
@@ -200,7 +245,7 @@ export default function CondominioManagement() {
         modules: formData.modules,
         structure: {
           totalUnits: parseInt(formData.totalUnits) || 0,
-          blocks: formData.blocks.split(',').map(b => b.trim()).filter(Boolean)
+          blocks: processedBlocks
         },
         cadastro: {
           cnpj: formData.cnpj,
@@ -219,7 +264,6 @@ export default function CondominioManagement() {
       }
 
       if (editingId) {
-        // UPDATE
         const { error } = await supabase
           .from('condominios')
           .update({
@@ -232,7 +276,6 @@ export default function CondominioManagement() {
         if (error) throw error
         toast.success('Condomínio atualizado!', { id: toastId })
       } else {
-        // INSERT
         const { error } = await supabase.from('condominios').insert({
           name: formData.name,
           slug: formData.slug,
@@ -246,9 +289,12 @@ export default function CondominioManagement() {
       setIsModalOpen(false)
       setFormData(INITIAL_FORM)
       setEditingId(null)
+      
+      // Recarrega lista
       loadCondominios()
 
     } catch (error: any) {
+      console.error(error)
       toast.error('Erro: ' + error.message, { id: toastId })
     }
   }
@@ -275,43 +321,45 @@ export default function CondominioManagement() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {condominios.map((cond) => (
-            <div key={cond.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition group">
-              <div className="flex justify-between items-start mb-3">
-                <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">
-                  🏢
+            <div key={cond.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition group flex flex-col justify-between h-full">
+              <div>
+                <div className="flex justify-between items-start mb-3">
+                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">
+                    🏢
+                  </div>
+                  <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2 py-1 rounded border border-blue-100">
+                    {cond.slug}
+                  </span>
                 </div>
-                <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2 py-1 rounded border border-blue-100">
-                  {cond.slug}
-                </span>
+                <h3 className="font-bold text-gray-900 text-lg mb-1 truncate" title={cond.name}>{cond.name}</h3>
+                <p className="text-xs text-gray-500 mb-4 line-clamp-2" title={cond.theme_config?.cadastro?.address}>
+                  {cond.theme_config?.cadastro?.address || 'Endereço não informado'}
+                </p>
+                
+                {cond.theme_config?.cadastro?.location?.plusCode && (
+                  <div className="mb-4 bg-blue-50 p-2 rounded text-center">
+                    <a 
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cond.theme_config.cadastro.location.plusCode)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-blue-700 font-mono hover:underline flex items-center justify-center gap-1"
+                    >
+                      📍 {cond.theme_config.cadastro.location.plusCode}
+                    </a>
+                  </div>
+                )}
               </div>
-              <h3 className="font-bold text-gray-900 text-lg mb-1">{cond.name}</h3>
-              <p className="text-xs text-gray-500 mb-4 truncate">
-                {cond.theme_config?.cadastro?.address || 'Endereço não informado'}
-              </p>
               
-              {cond.theme_config?.cadastro?.location?.plusCode && (
-                <div className="mb-4 bg-blue-50 p-2 rounded text-center">
-                  <a 
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cond.theme_config.cadastro.location.plusCode)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs text-blue-700 font-mono hover:underline flex items-center justify-center gap-1"
-                  >
-                    📍 {cond.theme_config.cadastro.location.plusCode}
-                  </a>
-                </div>
-              )}
-              
-              <div className="flex gap-2 border-t border-gray-100 pt-3">
+              <div className="flex gap-2 border-t border-gray-100 pt-3 mt-auto">
                 <button 
                   onClick={() => handleEdit(cond)}
-                  className="flex-1 text-xs font-bold text-gray-600 hover:bg-gray-50 py-2 rounded transition"
+                  className="flex-1 text-xs font-bold text-gray-600 hover:bg-gray-50 py-2 rounded transition border border-gray-200"
                 >
                   Editar
                 </button>
                 <button 
                   onClick={() => handleAccess(cond.slug)}
-                  className="flex-1 text-xs font-bold text-blue-600 hover:bg-blue-50 py-2 rounded transition"
+                  className="flex-1 text-xs font-bold text-blue-600 hover:bg-blue-50 py-2 rounded transition border border-blue-100"
                 >
                   Acessar
                 </button>
@@ -400,7 +448,7 @@ export default function CondominioManagement() {
                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.plusCode)}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="bg-gray-100 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-200 flex items-center justify-center"
+                      className="bg-gray-100 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-200 flex items-center justify-center border border-gray-300"
                       title="Testar Link"
                     >
                       📍
@@ -418,15 +466,15 @@ export default function CondominioManagement() {
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1">Cor Primária</label>
                 <div className="flex gap-2">
-                  <input type="color" className="h-9 w-9 rounded cursor-pointer border border-gray-200" value={formData.primaryColor} onChange={e => setFormData({...formData, primaryColor: e.target.value})} />
-                  <input type="text" className="flex-1 px-3 py-2 border rounded-lg text-sm uppercase" value={formData.primaryColor} onChange={e => setFormData({...formData, primaryColor: e.target.value})} />
+                  <input type="color" className="h-9 w-9 rounded cursor-pointer border border-gray-200 p-1" value={formData.primaryColor} onChange={e => setFormData({...formData, primaryColor: e.target.value})} />
+                  <input type="text" className="flex-1 px-3 py-2 border rounded-lg text-sm uppercase font-mono" value={formData.primaryColor} onChange={e => setFormData({...formData, primaryColor: e.target.value})} />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1">Cor Secundária</label>
                 <div className="flex gap-2">
-                  <input type="color" className="h-9 w-9 rounded cursor-pointer border border-gray-200" value={formData.secondaryColor} onChange={e => setFormData({...formData, secondaryColor: e.target.value})} />
-                  <input type="text" className="flex-1 px-3 py-2 border rounded-lg text-sm uppercase" value={formData.secondaryColor} onChange={e => setFormData({...formData, secondaryColor: e.target.value})} />
+                  <input type="color" className="h-9 w-9 rounded cursor-pointer border border-gray-200 p-1" value={formData.secondaryColor} onChange={e => setFormData({...formData, secondaryColor: e.target.value})} />
+                  <input type="text" className="flex-1 px-3 py-2 border rounded-lg text-sm uppercase font-mono" value={formData.secondaryColor} onChange={e => setFormData({...formData, secondaryColor: e.target.value})} />
                 </div>
               </div>
               <div className="col-span-2">
@@ -436,7 +484,7 @@ export default function CondominioManagement() {
             </div>
           </div>
 
-          {/* SECTION 3: ESTRUTURA */}
+          {/* SECTION 3: ESTRUTURA & MÓDULOS (ATUALIZADA) */}
           <div>
             <h4 className="font-bold text-gray-900 text-sm mb-3">3. Configuração</h4>
             <div className="grid grid-cols-2 gap-4 mb-4">
@@ -445,8 +493,15 @@ export default function CondominioManagement() {
                 <input type="number" className="w-full px-3 py-2 border rounded-lg text-sm" value={formData.totalUnits} onChange={e => setFormData({...formData, totalUnits: e.target.value})} />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Blocos (sep. vírgula)</label>
-                <input type="text" className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="A, B, C..." value={formData.blocks} onChange={e => setFormData({...formData, blocks: e.target.value})} />
+                <label className="block text-xs font-bold text-gray-600 mb-1">Blocos / Ruas</label>
+                <input 
+                    type="text" 
+                    className="w-full px-3 py-2 border rounded-lg text-sm" 
+                    placeholder="Ex: Bloco A, Bloco B, Rua 1" 
+                    value={formData.blocks} 
+                    onChange={e => setFormData({...formData, blocks: e.target.value})} 
+                />
+                <p className="text-[10px] text-gray-400 mt-1">Separe por vírgulas. Usado no cadastro de moradores.</p>
               </div>
             </div>
             
@@ -454,26 +509,26 @@ export default function CondominioManagement() {
               <p className="text-xs font-bold text-gray-500 uppercase mb-2">Módulos Ativos</p>
               <div className="grid grid-cols-2 gap-2">
                 {Object.keys(formData.modules).map((key) => (
-                  <label key={key} className="flex items-center gap-2 cursor-pointer">
+                  <label key={key} className="flex items-center gap-2 cursor-pointer select-none hover:bg-gray-100 p-1 rounded transition">
                     <input 
                       type="checkbox" 
-                      className="w-4 h-4 text-primary rounded"
+                      className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
                       checked={(formData.modules as any)[key]}
                       onChange={e => setFormData({
                         ...formData, 
                         modules: { ...formData.modules, [key]: e.target.checked }
                       })}
                     />
-                    <span className="text-sm capitalize">{key}</span>
+                    <span className="text-sm capitalize font-medium text-gray-700">{key}</span>
                   </label>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="pt-2 border-t border-gray-100 flex gap-3">
-            <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-50">Cancelar</button>
-            <button type="submit" className="flex-1 py-2.5 bg-primary text-white font-bold rounded-lg hover:bg-primary-dark shadow-lg">{editingId ? 'Salvar' : 'Criar Condomínio'}</button>
+          <div className="pt-4 border-t border-gray-100 flex gap-3">
+            <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-50 transition">Cancelar</button>
+            <button type="submit" className="flex-1 py-2.5 bg-primary text-white font-bold rounded-lg hover:bg-primary-dark shadow-lg transition">{editingId ? 'Salvar Alterações' : 'Criar Condomínio'}</button>
           </div>
         </form>
       </Modal>

@@ -7,9 +7,12 @@ interface UserProfile {
   id: string
   email: string
   full_name: string | null
+  first_name?: string | null // Novo
+  last_name?: string | null // Novo
   role: UserRole
   phone: string | null
   unit_number: string | null
+  block?: string | null // Novo
   resident_type: string | null
   is_whatsapp: boolean | null
   condominio_id: string | null
@@ -23,18 +26,8 @@ interface AuthContextType {
   session: Session | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<void>
-  signUp: (
-    email: string, 
-    password: string, 
-    fullName: string, 
-    condominioId: string,
-    phone: string,
-    unitNumber: string,
-    residentType: string,
-    isWhatsapp: boolean
-  ) => Promise<void>
+  signUp: (data: any) => Promise<void> // Simplificado para any ou tipar com SignupFormData
   signOut: () => Promise<void>
-  
   isAdmin: boolean
   isSindico: boolean
   isSubSindico: boolean
@@ -107,27 +100,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error
   }
 
-  async function signUp(
+  // ATUALIZADO: Recebe objeto completo
+  async function signUp(formData: {
     email: string, 
     password: string, 
-    fullName: string, 
+    firstName: string,
+    lastName: string,
     condominioId: string,
     phone: string,
     unitNumber: string,
+    block: string,
     residentType: string,
     isWhatsapp: boolean
-  ) {
+  }) {
+    const fullName = `${formData.firstName} ${formData.lastName}`.trim()
+
     const { error } = await supabase.auth.signUp({
-      email,
-      password,
+      email: formData.email,
+      password: formData.password,
       options: {
         data: {
-          full_name: fullName,
-          condominio_id: condominioId,
-          phone: phone,
-          unit_number: unitNumber,
-          resident_type: residentType,
-          is_whatsapp: isWhatsapp,
+          full_name: fullName, // Mantém retrocompatibilidade
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          condominio_id: formData.condominioId,
+          phone: formData.phone,
+          unit_number: formData.unitNumber,
+          block: formData.block,
+          resident_type: formData.residentType,
+          is_whatsapp: formData.isWhatsapp,
           role: 'pending'
         },
       },
