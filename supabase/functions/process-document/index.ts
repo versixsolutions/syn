@@ -1,143 +1,141 @@
-import { serve } from 'std/http/server.ts'
-import { createClient } from '@supabase/supabase-js'
-import { pipeline, env } from '@xenova/transformers'
-
-// Configuração IA Local (Embeddings) no Deno
-env.useBrowserCache = false;
-env.allowLocalModels = false;
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { QdrantClient } from '../_shared/qdrant.ts'
+import { generateEmbeddings } from '../_shared/embeddings.ts'
+import { splitMarkdownIntoChunks } from '../_shared/chunking.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Segredos
-const LLAMA_CLOUD_API_KEY = Deno.env.get('LLAMA_CLOUD_API_KEY');
-const QDRANT_URL = Deno.env.get('QDRANT_URL');
-const QDRANT_API_KEY = Deno.env.get('QDRANT_API_KEY');
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-const SUPABASE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-// Configuração da Collection no Qdrant
-const COLLECTION_NAME = "norma_knowledge_base";
-
 serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
 
   try {
-    if (!LLAMA_CLOUD_API_KEY || !QDRANT_URL || !QDRANT_API_KEY) {
-      throw new Error("Chaves de API (Llama/Qdrant) não configuradas.");
+    const formData = await req.formData()
+    const file = formData.get('file') as File
+    const condominioId = formData.get('condominio_id') as string
+    const category = formData.get('category') as string || 'geral'
+
+    if (!file) {
+      throw new Error('Nenhum arquivo enviado')
     }
 
-    const formData = await req.formData();
-    const file = formData.get('file') as File;
-    const condominio_id = formData.get('condominio_id') as string;
-    const category = formData.get('category') as string;
-    const file_url = formData.get('file_url') as string;
+    console.log(`📄 Processando: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`)
 
-    if (!file) throw new Error("Arquivo não enviado.");
-
-    // 1. LlamaParse (Visão/OCR)
-    console.log(`[1/4] Enviando para LlamaParse: ${file.name}`);
+    // ===== PASSO 1: PROCESSAR PDF COM LLAMAPARSE =====
+    const LLAMAPARSE_API_KEY = Deno.env.get('LLAMAPARSE_API_KEY')
     
-    const llamaFormData = new FormData();
-    llamaFormData.append('file', file);
-    llamaFormData.append('language', 'pt');
-    llamaFormData.append('parsing_instruction', 'O documento é um regimento de condomínio. Preserve títulos, artigos e tabelas em Markdown.');
+    if (!LLAMAPARSE_API_KEY) {
+      throw new Error('LLAMAPARSE_API_KEY não configurada')
+    }
 
-    const uploadResp = await fetch('https://api.cloud.llamaindex.ai/api/parsing/upload', {
+    const parseFormData = new FormData()
+    parseFormData.append('file', file)
+    parseFormData.append('result_type', 'markdown')
+    parseFormData.append('language', 'pt')
+
+    const parseResponse = await fetch('https://api.cloud.llamaindex.ai/api/parsing/upload', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${LLAMA_CLOUD_API_KEY}` },
-      body: llamaFormData
-    });
+      headers: {
+        'Authorization': `Bearer ${LLAMAPARSE_API_KEY}`
+      },
+      body: parseFormData
+    })
 
-    if (!uploadResp.ok) throw new Error("Erro upload LlamaParse");
-    const { id: jobId } = await uploadResp.json();
+    if (!parseResponse.ok) {
+      throw new Error(`LlamaParse falhou: ${await parseResponse.text()}`)
+    }
 
-    // Polling
-    let markdown = '';
-    for (let i = 0; i < 60; i++) {
-      await new Promise(r => setTimeout(r, 2000));
-      const statusResp = await fetch(`https://api.cloud.llamaindex.ai/api/parsing/job/${jobId}`, {
-        headers: { 'Authorization': `Bearer ${LLAMA_CLOUD_API_KEY}` }
-      });
-      const statusData = await statusResp.json();
-      if (statusData.status === 'SUCCESS') {
-        const res = await fetch(`https://api.cloud.llamaindex.ai/api/parsing/job/${jobId}/result/markdown`, {
-             headers: { 'Authorization': `Bearer ${LLAMA_CLOUD_API_KEY}` }
-        });
-        const data = await res.json();
-        markdown = data.markdown;
-        break;
+    const parseData = await parseResponse.json()
+    const jobId = parseData.id
+
+    // Aguardar processamento
+    let markdown = ''
+    let attempts = 0
+    const maxAttempts = 30
+
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 2000)) // 2 segundos
+
+      const resultResponse = await fetch(`https://api.cloud.llamaindex.ai/api/parsing/job/${jobId}/result/markdown`, {
+        headers: {
+          'Authorization': `Bearer ${LLAMAPARSE_API_KEY}`
+        }
+      })
+
+      if (resultResponse.ok) {
+        const result = await resultResponse.json()
+        markdown = result.markdown
+        break
       }
+
+      attempts++
+      console.log(`⏳ Aguardando processamento... (${attempts}/${maxAttempts})`)
     }
 
-    if (!markdown) throw new Error("Timeout LlamaParse");
-
-    // 2. Chunking Semântico (Simples baseada em Headers Markdown)
-    console.log(`[2/4] Fragmentando texto...`);
-    const chunks = markdown
-      .split(/(?=\n#+\s+)/) // Quebra em títulos (#, ##, ###)
-      .map(c => c.trim())
-      .filter(c => c.length > 50);
-
-    // 3. Embeddings (Xenova/Local)
-    console.log(`[3/4] Gerando Embeddings (${chunks.length} chunks)...`);
-    const extractor = await pipeline('feature-extraction', 'Supabase/gte-small');
-    
-    const points = [];
-    for (const chunk of chunks) {
-        const output = await extractor(chunk, { pooling: 'mean', normalize: true });
-        const embedding = Array.from(output.data);
-        
-        points.push({
-            id: crypto.randomUUID(),
-            vector: embedding,
-            payload: {
-                content: chunk,
-                condominio_id: condominio_id,
-                source: file.name,
-                category: category,
-                file_url: file_url
-            }
-        });
+    if (!markdown || markdown.length < 50) {
+      throw new Error('Falha ao extrair texto do PDF')
     }
 
-    // 4. Salvar no Qdrant
-    console.log(`[4/4] Salvando no Qdrant...`);
-    
-    // Garantir que coleção existe
-    await fetch(`${QDRANT_URL}/collections/${COLLECTION_NAME}`, {
-        method: 'PUT',
-        headers: { 'api-key': QDRANT_API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vectors: { size: 384, distance: "Cosine" } })
-    });
+    console.log(`✅ PDF processado: ${markdown.length} caracteres`)
 
-    // Upsert pontos
-    const upsertResp = await fetch(`${QDRANT_URL}/collections/${COLLECTION_NAME}/points?wait=true`, {
-        method: 'PUT',
-        headers: { 'api-key': QDRANT_API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ points })
-    });
+    // ===== PASSO 2: QUEBRAR EM CHUNKS =====
+    const chunks = splitMarkdownIntoChunks(markdown, file.name)
+    console.log(`📦 Gerados ${chunks.length} chunks`)
 
-    if (!upsertResp.ok) {
-        const err = await upsertResp.text();
-        throw new Error(`Erro Qdrant Upsert: ${err}`);
-    }
+    // ===== PASSO 3: GERAR EMBEDDINGS =====
+    const texts = chunks.map(c => c.content)
+    const embeddings = await generateEmbeddings(texts)
+    console.log(`🧮 Gerados ${embeddings.length} embeddings`)
 
-    // 5. Registrar no Supabase (Log Visual)
-    const supabase = createClient(SUPABASE_URL!, SUPABASE_KEY!);
-    await supabase.from('library_files').insert({
-        title: file.name.replace('.pdf', ''),
-        file_url: file_url,
+    // ===== PASSO 4: INDEXAR NO QDRANT =====
+    const qdrant = new QdrantClient()
+    const timestamp = Date.now()
+
+    const points = chunks.map((chunk, i) => ({
+      id: `${condominioId}-${timestamp}-${i}`,
+      vector: embeddings[i],
+      payload: {
+        content: chunk.content,
+        title: file.name,
+        condominio_id: condominioId,
         category: category,
-        condominio_id: condominio_id
-    });
+        chunk_number: chunk.metadata.chunk_number,
+        total_chunks: chunks.length,
+        created_at: new Date().toISOString()
+      }
+    }))
 
-    return new Response(JSON.stringify({ success: true, chunks: chunks.length }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    await qdrant.upsertPoints(points)
+    console.log(`✅ ${points.length} pontos indexados no Qdrant`)
+
+    // ===== RETORNAR RESULTADO =====
+    return new Response(
+      JSON.stringify({
+        success: true,
+        markdown: markdown,
+        chunks_created: chunks.length,
+        file_name: file.name
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
 
   } catch (error: any) {
-    console.error("Erro Fatal:", error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    console.error('❌ Erro:', error)
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
   }
 })
