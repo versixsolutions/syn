@@ -49,26 +49,32 @@ serve(async (req: Request) => {
     const searchData = await searchResp.json();
     const hits = searchData.result || [];
 
-    // 3. Montar Contexto
-    const contextText = hits.map((hit: any) => hit.payload.content).join("\n\n---\n\n");
+    // 3. Montar Contexto (Enriquecido com Metadados para Citação)
+    const contextText = hits.map((hit: any) => 
+        `[Fonte: ${hit.payload.source || 'Documento Interno'}]: ${hit.payload.content}`
+    ).join("\n\n---\n\n");
     
     if (!contextText) {
-        return new Response(JSON.stringify({ answer: "Não encontrei informações sobre isso nos documentos do seu condomínio." }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ answer: "A informação não consta nos documentos do condomínio." }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // 4. Raciocínio com Groq (Llama 3)
+    // 4. Raciocínio com Groq (Prompt Otimizado conforme Seção 8 do PDF)
     const systemPrompt = `
-      Você é a Norma, gerente predial.
-      Use APENAS o contexto abaixo para responder.
-      Contexto: ${contextText}
-      
-      Pergunta: "${query}"
-      
-      Instruções:
-      - Responda em português do Brasil.
-      - Seja direta e educada.
-      - Cite a fonte se possível.
-      - Se não souber, diga que não consta.
+      Você é a Norma, uma gerente predial especialista e assistente virtual deste condomínio.
+      Sua tarefa é responder dúvidas dos moradores baseada ESTRITAMENTE no contexto fornecido abaixo.
+
+      CONTEXTO RECUPERADO:
+      ${contextText}
+
+      INSTRUÇÕES DE RESPOSTA:
+      1. Responda em português do Brasil, com tom educado e direto.
+      2. Use APENAS as informações do CONTEXTO acima. Não invente regras que não estão escritas.
+      3. Se a resposta não estiver no contexto, declare explicitamente: "A informação não consta no documento." ou "Não encontrei essa informação nas regras."
+      4. Cite a fonte (Regimento, Artigo ou nome do arquivo) sempre que possível para dar credibilidade.
+      5. Fale diretamente com o usuário (que se chama ${userName || 'Morador'}).
+
+      PERGUNTA DO USUÁRIO:
+      "${query}"
     `;
 
     const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -78,12 +84,11 @@ serve(async (req: Request) => {
             "Content-Type": "application/json"
         },
         body: JSON.stringify({
-            model: "llama3-8b-8192", // Modelo rápido e gratuito
+            model: "llama3-8b-8192", 
             messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: query }
+                { role: "system", content: systemPrompt }
             ],
-            temperature: 0.1
+            temperature: 0.1 // Baixa temperatura para reduzir alucinações
         })
     });
 
