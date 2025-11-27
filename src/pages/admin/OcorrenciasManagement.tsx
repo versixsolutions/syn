@@ -4,6 +4,7 @@ import { formatDateTime } from '../../lib/utils'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
 import Modal from '../../components/ui/Modal'
+import { useAdmin } from '../../contexts/AdminContext' // Importar
 
 interface OcorrenciaAdmin {
   id: string
@@ -19,7 +20,6 @@ interface OcorrenciaAdmin {
     unit_number: string
     phone: string
   }
-  // Campos administrativos (podem ser nulos se ainda não tratados)
   admin_response?: string
   internal_notes?: string
 }
@@ -33,16 +33,16 @@ const STATUS_OPTIONS = [
 ]
 
 export default function OcorrenciasManagement() {
+  const { selectedCondominioId } = useAdmin() // Contexto Global
+  
   const [ocorrencias, setOcorrencias] = useState<OcorrenciaAdmin[]>([])
   const [loading, setLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState<string>('todos')
   
-  // Estado do Modal de Detalhes
   const [selectedOcorrencia, setSelectedOcorrencia] = useState<OcorrenciaAdmin | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
-  // Form do Modal
   const [editForm, setEditForm] = useState({
     status: '',
     admin_response: '',
@@ -50,8 +50,10 @@ export default function OcorrenciasManagement() {
   })
 
   useEffect(() => {
-    loadOcorrencias()
-  }, [])
+    if (selectedCondominioId) {
+      loadOcorrencias()
+    }
+  }, [selectedCondominioId])
 
   async function loadOcorrencias() {
     setLoading(true)
@@ -66,11 +68,11 @@ export default function OcorrenciasManagement() {
             phone
           )
         `)
+        .eq('condominio_id', selectedCondominioId) // Filtro Seguro
         .order('created_at', { ascending: false })
 
       if (error) throw error
 
-      // Tipagem segura do retorno
       const formatted: OcorrenciaAdmin[] = (data || []).map(item => ({
         ...item,
         author: Array.isArray(item.author) ? item.author[0] : item.author
@@ -102,18 +104,9 @@ export default function OcorrenciasManagement() {
     try {
       const updates = {
         status: editForm.status,
-        admin_response: editForm.admin_response, // Precisaria criar coluna no banco se não existir
-        // internal_notes: editForm.internal_notes // Precisaria criar coluna no banco se não existir
+        admin_response: editForm.admin_response,
+        // internal_notes: editForm.internal_notes 
       }
-
-      // Nota: Se as colunas 'admin_response' e 'internal_notes' não existirem na tabela 'ocorrencias',
-      // este update falhará ou ignorará esses campos. Recomenda-se criar essas colunas via SQL.
-      
-      // Por enquanto, vamos atualizar apenas o status e (se existirem) os outros campos
-      // Para garantir que funcione com o schema atual, vamos tentar atualizar.
-      // Se der erro de coluna inexistente, o Supabase geralmente avisa.
-      
-      // Workaround seguro para MVP: Vamos assumir que você vai rodar o SQL de migração abaixo.
       
       const { error } = await supabase
         .from('ocorrencias')
@@ -122,7 +115,6 @@ export default function OcorrenciasManagement() {
 
       if (error) throw error
 
-      // Atualiza estado local
       setOcorrencias(prev => prev.map(o => 
         o.id === selectedOcorrencia.id 
           ? { ...o, ...updates } 
@@ -154,7 +146,7 @@ export default function OcorrenciasManagement() {
           <select 
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="bg-transparent text-sm font-medium text-gray-600 outline-none px-2 py-1"
+            className="bg-transparent text-sm font-medium text-gray-600 outline-none px-2 py-1 cursor-pointer"
           >
             <option value="todos">Todos os Status</option>
             {STATUS_OPTIONS.map(opt => (
@@ -176,8 +168,7 @@ export default function OcorrenciasManagement() {
               onClick={() => openDetails(oco)}
               className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition cursor-pointer flex flex-col sm:flex-row gap-4"
             >
-              {/* Foto Thumbnail */}
-              <div className="w-full sm:w-24 h-24 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center">
+              <div className="w-full sm:w-24 h-24 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center border border-gray-200">
                 {oco.photo_url ? (
                   <img src={oco.photo_url} alt="Evidência" className="w-full h-full object-cover" />
                 ) : (
@@ -185,7 +176,6 @@ export default function OcorrenciasManagement() {
                 )}
               </div>
 
-              {/* Conteúdo */}
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start mb-1">
                   <h3 className="font-bold text-gray-900 truncate">{oco.title}</h3>
@@ -197,13 +187,13 @@ export default function OcorrenciasManagement() {
                 <p className="text-sm text-gray-600 line-clamp-2 mb-2">{oco.description}</p>
                 
                 <div className="flex flex-wrap gap-3 text-xs text-gray-500">
-                  <span className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded">
+                  <span className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded border border-gray-100">
                     👤 {oco.author?.full_name || 'Anônimo'}
                   </span>
-                  <span className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded">
+                  <span className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded border border-gray-100">
                     🏠 Unid: {oco.author?.unit_number || '-'}
                   </span>
-                  <span className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded">
+                  <span className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded border border-gray-100">
                     📍 {oco.location}
                   </span>
                   <span className="flex items-center gap-1">
@@ -216,7 +206,6 @@ export default function OcorrenciasManagement() {
         </div>
       )}
 
-      {/* MODAL DE DETALHES E TRATAMENTO */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -224,7 +213,6 @@ export default function OcorrenciasManagement() {
       >
         {selectedOcorrencia && (
           <div className="space-y-6">
-            {/* Cabeçalho do Modal */}
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
               <h4 className="font-bold text-lg text-gray-900 mb-1">{selectedOcorrencia.title}</h4>
               <p className="text-sm text-gray-700 mb-3">{selectedOcorrencia.description}</p>
@@ -244,7 +232,6 @@ export default function OcorrenciasManagement() {
               )}
             </div>
 
-            {/* Formulário de Tratamento */}
             <form onSubmit={handleSaveUpdate} className="space-y-4">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Alterar Status</label>
@@ -291,14 +278,14 @@ export default function OcorrenciasManagement() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-50"
+                  className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-50 transition"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="flex-1 py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md disabled:opacity-50"
+                  className="flex-1 py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md disabled:opacity-50 transition"
                 >
                   {isSaving ? 'Salvando...' : 'Salvar Tratamento'}
                 </button>

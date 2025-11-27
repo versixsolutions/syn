@@ -4,6 +4,7 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
 import Modal from '../../components/ui/Modal'
 import { useAuth } from '../../contexts/AuthContext'
+import { useAdmin } from '../../contexts/AdminContext'
 
 interface UserData {
   id: string
@@ -13,6 +14,7 @@ interface UserData {
   unit_number: string
   phone: string
   created_at: string
+  condominio_id: string
 }
 
 const ROLES = [
@@ -26,6 +28,7 @@ const ROLES = [
 
 export default function UserManagement() {
   const { user: currentUser, profile, isAdmin } = useAuth()
+  const { selectedCondominioId } = useAdmin() // Contexto Global
   
   const [users, setUsers] = useState<UserData[]>([])
   const [loading, setLoading] = useState(true)
@@ -36,15 +39,19 @@ export default function UserManagement() {
   const [editingUser, setEditingUser] = useState<UserData | null>(null)
 
   useEffect(() => {
-    loadUsers()
-  }, [])
+    if (selectedCondominioId) {
+      loadUsers()
+    }
+  }, [selectedCondominioId])
 
   async function loadUsers() {
     setLoading(true)
     try {
+      // Filtra usuários pelo condomínio selecionado
       const { data, error } = await supabase
         .from('users')
         .select('*')
+        .eq('condominio_id', selectedCondominioId) 
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -93,7 +100,6 @@ export default function UserManagement() {
       alert('Apenas Super Administradores podem editar outros Administradores.')
       return
     }
-
     setEditingUser({ ...targetUser })
     setIsEditModalOpen(true)
   }
@@ -105,12 +111,6 @@ export default function UserManagement() {
     if (!isAdmin && editingUser.role === 'admin') {
       alert('Você não tem permissão para promover usuários a Administrador.')
       return
-    }
-
-    if (editingUser.id === currentUser.id && editingUser.role !== profile?.role) {
-       if(!confirm('ATENÇÃO: Você está alterando seu próprio nível de acesso. Você pode perder acesso a esta tela. Continuar?')) {
-          return
-       }
     }
 
     setProcessingId(editingUser.id)
@@ -150,7 +150,7 @@ export default function UserManagement() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Gestão de Usuários</h1>
-          <p className="text-gray-500 text-sm">Administre permissões e cadastros.</p>
+          <p className="text-gray-500 text-sm">Administre permissões e cadastros deste condomínio.</p>
         </div>
         
         <div className="flex bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
@@ -166,7 +166,7 @@ export default function UserManagement() {
       {loading ? (
         <LoadingSpinner />
       ) : filteredUsers.length === 0 ? (
-        <EmptyState icon={filter === 'pending' ? '✅' : '👥'} title={filter === 'pending' ? 'Tudo limpo!' : 'Nenhum usuário'} description="Nenhum registro encontrado." />
+        <EmptyState icon={filter === 'pending' ? '✅' : '👥'} title={filter === 'pending' ? 'Tudo limpo!' : 'Nenhum usuário'} description="Nenhum registro encontrado para este condomínio." />
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
@@ -200,14 +200,14 @@ export default function UserManagement() {
                     <td className="px-6 py-4 text-right">
                       {user.role === 'pending' ? (
                         <div className="flex justify-end gap-2">
-                          <button onClick={() => handleReject(user.id)} className="text-red-600 hover:bg-red-50 p-2 rounded"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
-                          <button onClick={() => handleApprove(user.id)} className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-bold shadow hover:bg-green-700">Aprovar</button>
+                          <button onClick={() => handleReject(user.id)} className="text-red-600 hover:bg-red-50 p-2 rounded" title="Rejeitar"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                          <button onClick={() => handleApprove(user.id)} className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-bold shadow hover:bg-green-700 transition">Aprovar</button>
                         </div>
                       ) : (
                         (!isAdmin && user.role === 'admin') ? (
                           <span className="text-xs text-gray-400 italic">Protegido</span>
                         ) : (
-                          <button onClick={() => openEditModal(user)} className="text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded text-sm font-medium">Editar</button>
+                          <button onClick={() => openEditModal(user)} className="text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded text-sm font-medium transition">Editar</button>
                         )
                       )}
                     </td>
@@ -252,7 +252,7 @@ export default function UserManagement() {
             </div>
             <div className="pt-4 flex gap-3">
               <button type="button" onClick={() => setIsEditModalOpen(false)} className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50">Cancelar</button>
-              <button type="submit" disabled={!!processingId} className="flex-1 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 shadow-md">{processingId ? 'Salvando...' : 'Salvar Alterações'}</button>
+              <button type="submit" disabled={!!processingId} className="flex-1 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 shadow-md disabled:opacity-50">{processingId ? 'Salvando...' : 'Salvar Alterações'}</button>
             </div>
           </form>
         )}

@@ -5,6 +5,7 @@ import EmptyState from '../../components/EmptyState'
 import Modal from '../../components/ui/Modal'
 import toast from 'react-hot-toast'
 import { formatDateTime } from '../../lib/utils'
+import { useAdmin } from '../../contexts/AdminContext' // Importar
 
 interface Documento {
   id: number
@@ -22,27 +23,30 @@ interface Documento {
 }
 
 export default function KnowledgeBaseManagement() {
+  const { selectedCondominioId } = useAdmin() // Contexto Global
+
   const [documents, setDocuments] = useState<Documento[]>([])
   const [loading, setLoading] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
   const [docToDelete, setDocToDelete] = useState<Documento | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   
-  // Estados para Seleção Múltipla
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [isMassDeleteModalOpen, setIsMassDeleteModalOpen] = useState(false)
 
   useEffect(() => {
-    loadDocuments()
-  }, [])
+    if (selectedCondominioId) {
+      loadDocuments()
+    }
+  }, [selectedCondominioId])
 
   async function loadDocuments() {
     setLoading(true)
     try {
-      // Busca documentos ordenados por data de criação
       const { data, error } = await supabase
         .from('documents')
         .select('id, title, content, created_at, metadata, embedding') 
+        .eq('condominio_id', selectedCondominioId) // Filtro Seguro
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -56,11 +60,9 @@ export default function KnowledgeBaseManagement() {
     }
   }
 
-  // --- LÓGICA DE REPROCESSAMENTO MANUAL ---
   const handleReprocess = async (doc: Documento) => {
       const toastId = toast.loading('Reprocessando IA...');
       try {
-        // Chama a Edge Function para gerar embedding (agora via Gemini 768)
         const { data, error } = await supabase.functions.invoke('ask-ai', {
             body: { action: 'embed', text: doc.content }
         });
@@ -71,7 +73,6 @@ export default function KnowledgeBaseManagement() {
             throw new Error("A IA não retornou o vetor corretamente.");
         }
 
-        // Salva o embedding no banco
         const { error: updateError } = await supabase
             .from('documents')
             .update({ embedding: data.embedding })
@@ -79,7 +80,6 @@ export default function KnowledgeBaseManagement() {
         
         if (updateError) throw updateError;
         
-        // Atualiza lista local visualmente
         setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, embedding: data.embedding } : d));
         toast.success('IA Atualizada!', { id: toastId });
       } catch (err: any) {
@@ -88,7 +88,6 @@ export default function KnowledgeBaseManagement() {
       }
   }
 
-  // --- LÓGICA DE SELEÇÃO ---
   const toggleSelectAll = () => {
     if (selectedIds.size === filteredDocs.length && filteredDocs.length > 0) {
       setSelectedIds(new Set())
@@ -108,9 +107,7 @@ export default function KnowledgeBaseManagement() {
     setSelectedIds(newSet)
   }
 
-  // --- LÓGICA DE EXCLUSÃO ---
   const deleteDocument = async (doc: Documento) => {
-      // 1. Tenta excluir do Storage se for um documento pai (tem URL)
       if (doc.metadata?.url && !doc.metadata.is_chunk) {
         const pathRegex = /biblioteca\/(.*)/;
         const match = doc.metadata.url.match(pathRegex);
@@ -121,7 +118,6 @@ export default function KnowledgeBaseManagement() {
         }
       }
 
-      // 2. Excluir do Banco de Dados
       const { error } = await supabase.from('documents').delete().eq('id', doc.id)
       if (error) throw error
   }
@@ -164,7 +160,6 @@ export default function KnowledgeBaseManagement() {
     }
   }
 
-  // Filtro de busca local
   const filteredDocs = documents.filter(doc => 
     doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     doc.content.toLowerCase().includes(searchTerm.toLowerCase())
@@ -175,7 +170,7 @@ export default function KnowledgeBaseManagement() {
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Base de Conhecimento (IA)</h1>
-          <p className="text-gray-500 text-sm">Gerencie os documentos que a Norma usa para aprender.</p>
+          <p className="text-gray-500 text-sm">Gerencie os documentos que a Norma usa para aprender neste condomínio.</p>
         </div>
         
         <div className="flex items-center gap-3 w-full md:w-auto">
@@ -208,7 +203,7 @@ export default function KnowledgeBaseManagement() {
         <EmptyState 
             icon="🧠" 
             title="Nenhum documento encontrado" 
-            description={searchTerm ? "Tente outro termo de busca." : "A base de conhecimento está vazia."} 
+            description={searchTerm ? "Tente outro termo de busca." : "A base de conhecimento deste condomínio está vazia."} 
         />
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -293,7 +288,6 @@ export default function KnowledgeBaseManagement() {
         </div>
       )}
 
-      {/* MODAL DELETE INDIVIDUAL */}
       <Modal
         isOpen={!!docToDelete}
         onClose={() => setDocToDelete(null)}
@@ -310,7 +304,6 @@ export default function KnowledgeBaseManagement() {
         </div>
       </Modal>
 
-      {/* MODAL DELETE EM MASSA */}
       <Modal
         isOpen={isMassDeleteModalOpen}
         onClose={() => setIsMassDeleteModalOpen(false)}

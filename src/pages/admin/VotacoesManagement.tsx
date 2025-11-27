@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import { useAdmin } from '../../contexts/AdminContext' // Importar
 import { formatDateTime } from '../../lib/utils'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
@@ -19,22 +20,25 @@ interface Votacao {
 
 export default function VotacoesManagement() {
   const { user } = useAuth()
+  const { selectedCondominioId } = useAdmin() // Contexto Global
+
   const [votacoes, setVotacoes] = useState<Votacao[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
-  // Form State
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     endDate: '',
-    options: [{ id: 1, text: 'A Favor' }, { id: 2, text: 'Contra' }, { id: 3, text: 'Abstenção' }] // Padrão
+    options: [{ id: 1, text: 'A Favor' }, { id: 2, text: 'Contra' }, { id: 3, text: 'Abstenção' }]
   })
 
   useEffect(() => {
-    loadVotacoes()
-  }, [])
+    if (selectedCondominioId) {
+      loadVotacoes()
+    }
+  }, [selectedCondominioId])
 
   async function loadVotacoes() {
     setLoading(true)
@@ -42,11 +46,11 @@ export default function VotacoesManagement() {
       const { data, error } = await supabase
         .from('votacoes')
         .select('*')
+        .eq('condominio_id', selectedCondominioId) // Filtro Seguro
         .order('created_at', { ascending: false })
 
       if (error) throw error
       
-      // Calcula o status baseado na data
       const now = new Date()
       const formatted = (data || []).map(v => ({
         ...v,
@@ -72,7 +76,6 @@ export default function VotacoesManagement() {
     }
   }
 
-  // Manipulação de Opções Dinâmicas
   const addOption = () => {
     setFormData(prev => ({
       ...prev,
@@ -96,9 +99,8 @@ export default function VotacoesManagement() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!user) return
+    if (!user || !selectedCondominioId) return
 
-    // Validação
     if (formData.options.length < 2) {
       alert('A votação precisa ter pelo menos 2 opções.')
       return
@@ -113,17 +115,17 @@ export default function VotacoesManagement() {
       const { error } = await supabase.from('votacoes').insert({
         title: formData.title,
         description: formData.description,
-        end_date: formData.endDate, // Formato ISO
-        options: formData.options, // Salva como JSONB
+        end_date: formData.endDate,
+        options: formData.options,
         author_id: user.id,
-        is_secret: false // Simplificação para MVP
+        is_secret: false,
+        condominio_id: selectedCondominioId // INSERÇÃO SEGURA
       })
 
       if (error) throw error
 
       alert('Votação criada com sucesso!')
       setIsModalOpen(false)
-      // Reset form
       setFormData({
         title: '',
         description: '',
@@ -192,7 +194,6 @@ export default function VotacoesManagement() {
               
               <p className="text-gray-600 text-sm mb-3">{votacao.description}</p>
               
-              {/* Lista de Opções (Preview) */}
               <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                 <p className="text-xs font-bold text-gray-500 uppercase mb-2">Opções de Voto:</p>
                 <div className="flex flex-wrap gap-2">
@@ -208,7 +209,6 @@ export default function VotacoesManagement() {
         </div>
       )}
 
-      {/* MODAL DE CRIAÇÃO */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -250,7 +250,6 @@ export default function VotacoesManagement() {
             />
           </div>
 
-          {/* Opções Dinâmicas */}
           <div>
             <div className="flex justify-between items-center mb-2">
               <label className="block text-sm font-bold text-gray-700">Opções de Voto</label>
@@ -285,14 +284,14 @@ export default function VotacoesManagement() {
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-50"
+              className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-50 transition"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="flex-1 py-2.5 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 shadow-md disabled:opacity-50"
+              className="flex-1 py-2.5 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 shadow-md disabled:opacity-50 transition"
             >
               {isSaving ? 'Criando...' : 'Iniciar Votação'}
             </button>

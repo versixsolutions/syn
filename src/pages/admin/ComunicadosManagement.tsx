@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import { useAdmin } from '../../contexts/AdminContext' // Importar
 import { formatDateTime } from '../../lib/utils'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
@@ -28,12 +29,13 @@ const TYPES = [
 
 export default function ComunicadosManagement() {
   const { user } = useAuth()
+  const { selectedCondominioId } = useAdmin() // Contexto Global
+
   const [comunicados, setComunicados] = useState<Comunicado[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
-  // Form State
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -42,8 +44,10 @@ export default function ComunicadosManagement() {
   })
 
   useEffect(() => {
-    loadComunicados()
-  }, [])
+    if (selectedCondominioId) {
+      loadComunicados()
+    }
+  }, [selectedCondominioId])
 
   async function loadComunicados() {
     setLoading(true)
@@ -54,11 +58,11 @@ export default function ComunicadosManagement() {
           *,
           author:author_id(full_name)
         `)
+        .eq('condominio_id', selectedCondominioId) // Filtro Seguro
         .order('created_at', { ascending: false })
 
       if (error) throw error
       
-      // Mapeamento seguro para evitar erros de tipagem no author
       const formatted = (data || []).map(c => ({
         ...c,
         author: Array.isArray(c.author) ? c.author[0] : c.author
@@ -85,7 +89,7 @@ export default function ComunicadosManagement() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!user) return
+    if (!user || !selectedCondominioId) return
 
     setIsSaving(true)
     try {
@@ -93,8 +97,9 @@ export default function ComunicadosManagement() {
         title: formData.title,
         content: formData.content,
         type: formData.type,
-        priority: formData.isUrgent ? 3 : 1, // 3 = Alta, 1 = Normal
-        author_id: user.id
+        priority: formData.isUrgent ? 3 : 1,
+        author_id: user.id,
+        condominio_id: selectedCondominioId // INSERÇÃO SEGURA
       })
 
       if (error) throw error
@@ -116,7 +121,7 @@ export default function ComunicadosManagement() {
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Comunicados</h1>
-          <p className="text-gray-500 text-sm">Gerencie os avisos do mural digital.</p>
+          <p className="text-gray-500 text-sm">Gerencie os avisos do mural digital deste condomínio.</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
@@ -170,7 +175,6 @@ export default function ComunicadosManagement() {
         </div>
       )}
 
-      {/* MODAL DE CRIAÇÃO */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -206,7 +210,7 @@ export default function ComunicadosManagement() {
               <label className="flex items-center gap-2 cursor-pointer text-gray-700 font-medium">
                 <input
                   type="checkbox"
-                  className="w-5 h-5 text-red-600 rounded focus:ring-red-500"
+                  className="w-5 h-5 text-red-600 rounded focus:ring-red-500 cursor-pointer"
                   checked={formData.isUrgent}
                   onChange={e => setFormData({...formData, isUrgent: e.target.checked})}
                 />
@@ -231,14 +235,14 @@ export default function ComunicadosManagement() {
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-50"
+              className="flex-1 py-2.5 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-50 transition"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="flex-1 py-2.5 bg-primary text-white font-bold rounded-lg hover:bg-primary-dark shadow-md disabled:opacity-50"
+              className="flex-1 py-2.5 bg-primary text-white font-bold rounded-lg hover:bg-primary-dark shadow-md disabled:opacity-50 transition"
             >
               {isSaving ? 'Publicando...' : 'Publicar Agora'}
             </button>
