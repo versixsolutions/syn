@@ -8,67 +8,66 @@ const corsHeaders = {
 }
 
 serve(async (req: Request) => {
-  // Tratamento de CORS para requisições do browser
+  // 1. Tratamento de CORS (Preflight)
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
+    // 2. Verificar Autenticação do Solicitante (Admin)
     const supabaseClient = createClient(
-      // Supabase API URL - Env var exportada automaticamente pelo Supabase.
       Deno.env.get('SUPABASE_URL') ?? '',
-      // Supabase API ANON KEY - Env var exportada automaticamente pelo Supabase.
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      // Create client with Auth context of the user that called the function.
-      // This way your row-level-security (RLS) policies are applied.
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
 
-    // 1. Verificar se quem chama é ADMIN
-    const {
-      data: { user },
-    } = await supabaseClient.auth.getUser()
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
+    if (authError || !user) throw new Error('Não autenticado')
 
-    if (!user) throw new Error('Não autenticado')
-
-    // Buscar role na tabela public.users para garantir que é admin
+    // Verificar se é admin na tabela users
     const { data: profile } = await supabaseClient
       .from('users')
       .select('role')
       .eq('id', user.id)
       .single()
 
-    if (profile?.role !== 'admin' && profile?.role !== 'sindico') {
-      return new Response(JSON.stringify({ error: 'Sem permissão (Apenas Admin/Síndico)' }), {
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'sindico')) {
+      return new Response(JSON.stringify({ error: 'Permissão negada. Apenas Admin/Síndico.' }), {
         status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    // 2. Pegar o ID do alvo no corpo da requisição
+    // 3. Pegar ID do alvo
     const { userId } = await req.json()
-    if (!userId) throw new Error('ID do usuário não fornecido')
+    if (!userId) throw new Error('ID do usuário é obrigatório')
 
-    // 3. Instanciar cliente ADMIN (Service Role) para poder deletar do Auth
+    console.log(`🗑️ Deletando usuário: ${userId}`)
+
+    // 4. Deletar usando Cliente Service Role (Admin Supremo)
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '' // ESSA CHAVE PRECISA ESTAR NO .ENV DO SUPABASE
     )
 
-    // 4. Deletar usuário do Auth (Isso dispara o CASCADE para public.users)
+    // Deleta do Auth (o banco deve ter ON DELETE CASCADE para limpar o resto)
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId)
 
-    if (deleteError) throw deleteError
+    if (deleteError) {
+      console.error('Erro ao deletar do Auth:', deleteError)
+      throw deleteError
+    }
 
-    return new Response(JSON.stringify({ success: true, message: 'Usuário deletado com sucesso' }), {
+    return new Response(JSON.stringify({ success: true, message: 'Usuário excluído definitivamente.' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
 
   } catch (error: any) {
+    console.error('Erro na Edge Function:', error)
     return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 })

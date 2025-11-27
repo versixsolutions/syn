@@ -35,6 +35,7 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'pending' | 'active'>('pending')
   const [processingId, setProcessingId] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserData | null>(null)
@@ -107,7 +108,6 @@ export default function UserManagement() {
     } catch (error: any) {
       console.error('Erro ao deletar:', error)
       // Fallback: Se a Edge Function falhar (ex: configuração), tenta deletar só do banco público
-      // Isso deixa um "usuário fantasma" no Auth, mas limpa a tela do admin.
       if (confirm('A exclusão completa falhou. Deseja forçar a remoção apenas do painel (o login pode permanecer)?')) {
           const { error: dbError } = await supabase.from('users').delete().eq('id', id)
           if (!dbError) {
@@ -133,6 +133,7 @@ export default function UserManagement() {
     setIsEditModalOpen(true)
   }
 
+  // Função correta para salvar edição
   async function handleSaveEdit(e: React.FormEvent) {
     e.preventDefault()
     if (!editingUser || !currentUser) return
@@ -259,7 +260,7 @@ export default function UserManagement() {
                                     onClick={() => handleDeleteUser(user.id)}
                                     disabled={processingId === user.id}
                                     className="text-red-500 hover:bg-red-50 p-1.5 rounded transition"
-                                    title="Excluir Definitivamente"
+                                    title="Excluir Usuário"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                 </button>
@@ -278,6 +279,7 @@ export default function UserManagement() {
 
       <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Editar Usuário">
         {editingUser && (
+          // CORREÇÃO: onSubmit agora chama handleSaveEdit (nome correto)
           <form onSubmit={handleSaveEdit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
