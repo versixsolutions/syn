@@ -1,3 +1,7 @@
+// supabase/functions/ask-ai/index.ts
+// Versão CORRIGIDA e COMPATÍVEL com Supabase Edge Functions
+
+// @deno-types="https://deno.land/std@0.168.0/http/server.ts"
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const corsHeaders = {
@@ -5,7 +9,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-serve(async (req: Request) => {
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -29,197 +33,96 @@ serve(async (req: Request) => {
     console.log(`🔍 Query: "${query}"`)
     console.log(`🏢 Condomínio: ${filter_condominio_id}`)
 
-    // ===== ESTRATÉGIA NOVA: BUSCA HÍBRIDA (Texto + Semântica) =====
-    // Qdrant suporta busca por texto sem precisar de embeddings externos
-    
-    const searchPayload = {
-      query: {
-        fusion: "rrf", // Ranked Reciprocal Fusion (combina busca semântica + texto)
-        prefetch: [
-          {
-            // Busca 1: Por texto (BM25)
-            query: {
-              text: query
-            },
-            using: "text",
-            limit: 10
-          },
-          {
-            // Busca 2: Por semântica (se tiver embeddings)
-            query: {
-              text: query
-            },
-            using: "dense",
-            limit: 10
-          }
-        ]
-      },
-      limit: 5,
-      with_payload: true,
-      score_threshold: 0.5,
-      filter: {
-        must: [
-          {
-            key: "condominio_id",
-            match: { value: filter_condominio_id }
-          }
-        ]
-      }
-    }
+    // ===== BUSCA SIMPLIFICADA (MVP - SEM EMBEDDINGS DA QUERY) =====
+    // Usar scroll para buscar todos os documentos e filtrar manualmente
+    console.log('🔎 Buscando documentos relevantes...')
 
-    console.log('🔎 Buscando no Qdrant...')
-
-    const searchResp = await fetch(
-      `${QDRANT_URL}/collections/${COLLECTION_NAME}/points/query`,
+    const scrollResp = await fetch(
+      `${QDRANT_URL}/collections/${COLLECTION_NAME}/points/scroll`,
       {
         method: 'POST',
         headers: {
-          'api-key': QDRANT_API_KEY!,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(searchPayload)
-      }
-    )
-
-    if (!searchResp.ok) {
-      const errorText = await searchResp.text()
-      console.error('❌ Qdrant Error:', errorText)
-      
-      // FALLBACK: Busca simples por scroll (se a busca híbrida falhar)
-      console.log('⚠️ Tentando busca alternativa...')
-      
-      const fallbackResp = await fetch(
-        `${QDRANT_URL}/collections/${COLLECTION_NAME}/points/scroll`,
-        {
-          method: 'POST',
-          headers: {
-            'api-key': QDRANT_API_KEY!,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            filter: {
-              must: [
-                {
-                  key: "condominio_id",
-                  match: { value: filter_condominio_id }
-                }
-              ]
-            },
-            limit: 10,
-            with_payload: true
-          })
-        }
-      )
-
-      if (!fallbackResp.ok) {
-        throw new Error('Falha na busca no Qdrant')
-      }
-
-      const fallbackData = await fallbackResp.json()
-      const allPoints = fallbackData.result?.points || []
-      
-      // Filtrar manualmente por palavras-chave
-      const queryWords = query.toLowerCase().split(' ').filter(w => w.length > 3)
-      const rankedResults = allPoints
-        .map((point: any) => {
-          const content = point.payload.content.toLowerCase()
-          const score = queryWords.reduce((acc: number, word: string) => {
-            return acc + (content.includes(word) ? 1 : 0)
-          }, 0)
-          return { ...point, score: score / queryWords.length }
-        })
-        .filter((r: any) => r.score > 0.3)
-        .sort((a: any, b: any) => b.score - a.score)
-        .slice(0, 5)
-
-      if (rankedResults.length === 0) {
-        return new Response(
-          JSON.stringify({
-            answer: 'Não encontrei informações sobre isso nos documentos do condomínio. Você pode reformular a pergunta ou verificar se os documentos relevantes foram adicionados na Biblioteca.',
-            sources: []
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        )
-      }
-
-      console.log(`📊 Busca alternativa: ${rankedResults.length} resultados`)
-
-      // Continuar com os resultados do fallback
-      const contextParts = rankedResults.map((r: any, i: number) => {
-        const source = r.payload.title || 'Documento'
-        return `[Fonte ${i + 1}: ${source}]\n${r.payload.content}`
-      })
-
-      const contextText = contextParts.join('\n\n---\n\n')
-
-      // PROMPT ENGINEERING
-      const systemPrompt = `Você é a Norma, assistente virtual de gestão condominial.
-
-**INSTRUÇÕES CRÍTICAS:**
-1. Responda APENAS com base no CONTEXTO fornecido abaixo
-2. Se a informação NÃO estiver no contexto, diga: "Não encontrei essa informação nos documentos disponíveis"
-3. Seja concisa e objetiva (máximo 150 palavras)
-4. Use bullets quando listar múltiplos itens
-5. Cite a fonte quando possível (ex: "Segundo o Regimento Interno...")
-6. Fale em português do Brasil, de forma profissional mas acessível
-
-**CONTEXTO:**
-${contextText}
-
-**IMPORTANTE:** Não invente informações. Se não souber, admita.`
-
-      console.log('🤖 Chamando Groq...')
-
-      const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${GROQ_API_KEY}`,
+          'api-key': QDRANT_API_KEY,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: query }
-          ],
-          temperature: 0.1,
-          max_tokens: 500
+          filter: {
+            must: [
+              {
+                key: 'condominio_id',
+                match: { value: filter_condominio_id }
+              }
+            ]
+          },
+          limit: 50,
+          with_payload: true
         })
-      })
-
-      if (!groqResponse.ok) {
-        throw new Error(`Groq API falhou: ${await groqResponse.text()}`)
       }
+    )
 
-      const groqData = await groqResponse.json()
-      const answer = groqData.choices?.[0]?.message?.content || 'Erro ao gerar resposta'
-
-      console.log(`✅ Resposta gerada`)
-
-      return new Response(
-        JSON.stringify({
-          answer,
-          sources: rankedResults.map((r: any) => ({
-            title: r.payload.title,
-            score: r.score,
-            excerpt: r.payload.content.substring(0, 150) + '...'
-          }))
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+    if (!scrollResp.ok) {
+      const errorText = await scrollResp.text()
+      console.error('❌ Qdrant Error:', errorText)
+      throw new Error(`Busca falhou: ${errorText}`)
     }
 
-    // Se a busca híbrida funcionou
-    const searchData = await searchResp.json()
-    const hits = searchData.points || []
+    const scrollData = await scrollResp.json()
+    const allPoints = scrollData.result?.points || []
 
-    console.log(`📊 Encontrados ${hits.length} resultados`)
+    console.log(`📄 Total de documentos encontrados: ${allPoints.length}`)
 
-    if (hits.length === 0) {
+    // ===== FILTRAR MANUALMENTE POR PALAVRAS-CHAVE (MVP) =====
+    // Tokenizar query e normalizar
+    const queryWords = query
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .split(/\s+/)
+      .filter((w) => w.length > 2) // Filtrar palavras muito curtas
+
+    console.log(`🔍 Buscando por: ${queryWords.join(', ')}`)
+
+    // Calcular score para cada documento
+    const rankedResults = allPoints
+      .map((point) => {
+        const content = point.payload.content.toLowerCase()
+        const title = point.payload.title.toLowerCase()
+        
+        let score = 0
+        
+        // Score por palavra no título (peso maior)
+        queryWords.forEach((word) => {
+          if (title.includes(word)) {
+            score += 5
+          }
+        })
+        
+        // Score por palavra no conteúdo
+        queryWords.forEach((word) => {
+          const matches = (content.match(new RegExp(word, 'g')) || []).length
+          score += matches
+        })
+        
+        // Boost se contém query exata
+        const normalizedQuery = query.toLowerCase()
+        if (content.includes(normalizedQuery)) {
+          score += 10
+        }
+        
+        // Boost se contém frase similar
+        if (title.includes(normalizedQuery)) {
+          score += 15
+        }
+        
+        return { ...point, score }
+      })
+      .filter((r) => r.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3) // Top 3 resultados
+
+    console.log(`📊 Encontrados ${rankedResults.length} resultados relevantes`)
+
+    if (rankedResults.length === 0) {
       return new Response(
         JSON.stringify({
           answer: 'Não encontrei informações sobre isso nos documentos do condomínio. Você pode reformular a pergunta ou verificar se os documentos relevantes foram adicionados na Biblioteca.',
@@ -231,16 +134,13 @@ ${contextText}
       )
     }
 
-    // RE-RANKING
-    const rankedResults = hits
-      .filter((r: any) => r.score > 0.5)
-      .sort((a: any, b: any) => b.score - a.score)
-      .slice(0, 3)
+    // Log de debug
+    if (rankedResults.length > 0) {
+      console.log(`⭐ Top resultado: "${rankedResults[0].payload.title}" (score=${rankedResults[0].score})`)
+    }
 
-    console.log(`⭐ Top resultado: score=${rankedResults[0]?.score.toFixed(3)}`)
-
-    // MONTAR CONTEXTO
-    const contextParts = rankedResults.map((r: any, i: number) => {
+    // ===== MONTAR CONTEXTO PARA GROQ =====
+    const contextParts = rankedResults.map((r, i) => {
       const source = r.payload.title || 'Documento'
       return `[Fonte ${i + 1}: ${source}]\n${r.payload.content}`
     })
@@ -249,7 +149,7 @@ ${contextText}
 
     console.log(`💬 Contexto: ${contextText.length} caracteres`)
 
-    // PROMPT ENGINEERING
+    // ===== PROMPT ENGINEERING =====
     const systemPrompt = `Você é a Norma, assistente virtual de gestão condominial.
 
 **INSTRUÇÕES CRÍTICAS:**
@@ -267,6 +167,7 @@ ${contextText}
 
     console.log('🤖 Chamando Groq...')
 
+    // ===== CHAMAR GROQ LLM =====
     const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -285,7 +186,9 @@ ${contextText}
     })
 
     if (!groqResponse.ok) {
-      throw new Error(`Groq API falhou: ${await groqResponse.text()}`)
+      const errorText = await groqResponse.text()
+      console.error('❌ Groq Error:', errorText)
+      throw new Error(`Groq API falhou: ${errorText}`)
     }
 
     const groqData = await groqResponse.json()
@@ -293,10 +196,11 @@ ${contextText}
 
     console.log(`✅ Resposta gerada (${answer.length} caracteres)`)
 
+    // ===== RETORNAR RESPOSTA =====
     return new Response(
       JSON.stringify({
         answer,
-        sources: rankedResults.map((r: any) => ({
+        sources: rankedResults.map((r) => ({
           title: r.payload.title,
           score: r.score,
           excerpt: r.payload.content.substring(0, 150) + '...'
@@ -307,7 +211,7 @@ ${contextText}
       }
     )
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Erro:', error)
     return new Response(
       JSON.stringify({

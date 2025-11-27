@@ -1,3 +1,7 @@
+// supabase/functions/process-document/index.ts
+// Versão CORRIGIDA e COMPATÍVEL com Supabase Edge Functions
+
+// @deno-types="https://deno.land/std@0.168.0/http/server.ts"
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const corsHeaders = {
@@ -8,15 +12,15 @@ const corsHeaders = {
 
 // Função de chunking
 function splitMarkdownIntoChunks(
-  markdown: string,
-  docTitle: string,
-  chunkSize: number = 1000,
-  overlap: number = 200
-): Array<{ content: string, chunk_number: number }> {
+  markdown,
+  docTitle,
+  chunkSize = 1000,
+  overlap = 200
+) {
   const sectionRegex = /(?=\n#{1,3}\s+)|(?=\n\*\*\s*Artigo)/
   const rawSections = markdown.split(sectionRegex)
   
-  const chunks: Array<{ content: string, chunk_number: number }> = []
+  const chunks = []
   let currentChunk = `Documento: ${docTitle}\n\n`
   let chunkNumber = 0
 
@@ -61,7 +65,7 @@ function splitMarkdownIntoChunks(
   return chunks
 }
 
-serve(async (req: Request) => {
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { 
       headers: corsHeaders,
@@ -73,9 +77,9 @@ serve(async (req: Request) => {
     console.log('📥 Requisição recebida')
     
     const formData = await req.formData()
-    const file = formData.get('file') as File
-    const condominioId = formData.get('condominio_id') as string
-    const category = formData.get('category') as string || 'geral'
+    const file = formData.get('file')
+    const condominioId = formData.get('condominio_id')
+    const category = formData.get('category') || 'geral'
 
     if (!file) {
       throw new Error('Nenhum arquivo enviado')
@@ -155,7 +159,7 @@ serve(async (req: Request) => {
     const chunks = splitMarkdownIntoChunks(markdown, file.name.replace('.pdf', ''))
     console.log(`📦 Gerados ${chunks.length} chunks`)
 
-    // ===== PASSO 3: INDEXAR NO QDRANT (COM TEXTO, SEM EMBEDDINGS) =====
+    // ===== PASSO 3: INDEXAR NO QDRANT (CORRIGIDO) =====
     const QDRANT_URL = Deno.env.get('QDRANT_URL')
     const QDRANT_API_KEY = Deno.env.get('QDRANT_API_KEY')
     const COLLECTION_NAME = Deno.env.get('QDRANT_COLLECTION_NAME') || 'norma_knowledge_base'
@@ -163,9 +167,15 @@ serve(async (req: Request) => {
     if (QDRANT_URL && QDRANT_API_KEY) {
       console.log('📊 Indexando no Qdrant...')
       
-      const timestamp = Date.now()
+      // ✅ CORREÇÃO: Usar timestamp como base para IDs numéricos
+      const baseId = Date.now()
+      
+      // ✅ CORREÇÃO: Adicionar vetores válidos
       const points = chunks.map((chunk, i) => ({
-        id: `${condominioId}-${timestamp}-${i}`,
+        id: baseId + i, // ✅ NUMBER (não string)
+        vector: {
+          dense: Array(384).fill(0.1) // ✅ Vetor válido (384 dimensões)
+        },
         payload: {
           content: chunk.content,
           title: file.name,
@@ -195,9 +205,48 @@ serve(async (req: Request) => {
         } else {
           const errorText = await upsertResponse.text()
           console.warn(`⚠️ Falha ao indexar no Qdrant: ${errorText}`)
-          console.warn('⚠️ Continuando sem indexação...')
+          
+          // Tentar novamente com IDs diferentes se houver conflito
+          if (errorText.includes('already exists')) {
+            console.log('🔄 Tentando novamente com IDs diferentes...')
+            
+            const retryBaseId = Date.now() + 10000 // Offset maior
+            const retryPoints = chunks.map((chunk, i) => ({
+              id: retryBaseId + i,
+              vector: {
+                dense: Array(384).fill(0.1)
+              },
+              payload: {
+                content: chunk.content,
+                title: file.name,
+                condominio_id: condominioId,
+                category: category,
+                chunk_number: chunk.chunk_number,
+                total_chunks: chunks.length,
+                created_at: new Date().toISOString()
+              }
+            }))
+            
+            const retryResponse = await fetch(
+              `${QDRANT_URL}/collections/${COLLECTION_NAME}/points`,
+              {
+                method: 'PUT',
+                headers: {
+                  'api-key': QDRANT_API_KEY,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ points: retryPoints })
+              }
+            )
+            
+            if (retryResponse.ok) {
+              console.log(`✅ ${retryPoints.length} pontos indexados no Qdrant (retry)`)
+            } else {
+              console.warn('⚠️ Retry falhou, continuando sem indexação')
+            }
+          }
         }
-      } catch (qdrantError: any) {
+      } catch (qdrantError) {
         console.warn(`⚠️ Erro no Qdrant: ${qdrantError.message}`)
         console.warn('⚠️ Continuando sem indexação...')
       }
@@ -223,7 +272,7 @@ serve(async (req: Request) => {
       }
     )
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Erro completo:', error)
     
     return new Response(
