@@ -35,15 +35,14 @@ import ComunicadosManagement from './pages/admin/ComunicadosManagement'
 import VotacoesManagement from './pages/admin/VotacoesManagement'
 import FinanceiroManagement from './pages/admin/FinanceiroManagement'
 import KnowledgeBaseManagement from './pages/admin/KnowledgeBaseManagement'
+import MarketplaceManagement from './pages/admin/MarketplaceManagement' // Nova Importação
 
 // --- COMPONENTES DE PROTEÇÃO DE ROTA ---
 
-// Protege rotas que exigem autenticação e aprovação
 function PrivateRoute({ children, adminOnly = false }: { children: React.ReactNode, adminOnly?: boolean }) {
   const { session, loading, profile, canManage, authError, signOut } = useAuth()
   const location = useLocation()
 
-  // Efeito para forçar logout se houver erro crítico de integridade (usuário órfão)
   useEffect(() => {
     if (!loading && session && !profile && authError) {
       console.warn('Sessão inválida detectada (sem perfil). Forçando logout...')
@@ -55,23 +54,18 @@ function PrivateRoute({ children, adminOnly = false }: { children: React.ReactNo
     return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500 text-sm font-medium">Carregando Versix...</div>
   }
   
-  // Se não tem sessão, manda pro login
   if (!session) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  // SEGURANÇA CRÍTICA: Se tem sessão mas não tem perfil (Usuário Órfão), nega acesso.
-  // O useEffect acima já deve tratar o logout, mas isso garante que nada renderize.
   if (!profile) {
     return <Navigate to="/login" replace />
   }
 
-  // Se o cadastro ainda está pendente, manda pra tela de espera
   if (profile.role === 'pending') {
     return <Navigate to="/pending-approval" replace />
   }
 
-  // Se a rota é só para admin e o usuário não tem permissão, manda pra home do morador
   if (adminOnly && !canManage) {
     return <Navigate to="/" replace />
   }
@@ -79,7 +73,6 @@ function PrivateRoute({ children, adminOnly = false }: { children: React.ReactNo
   return <>{children}</>
 }
 
-// Protege a rota de "Aprovação Pendente" (só acessa quem realmente está pendente)
 function PendingRoute({ children }: { children: React.ReactNode }) {
   const { session, loading, profile } = useAuth()
 
@@ -87,7 +80,6 @@ function PendingRoute({ children }: { children: React.ReactNode }) {
   
   if (!session) return <Navigate to="/login" replace />
   
-  // Se já foi aprovado, não tem o que fazer aqui, vai pro dashboard
   if (profile?.role && profile.role !== 'pending') {
     return <Navigate to="/" replace />
   }
@@ -102,66 +94,27 @@ export default function App() {
         <ThemeProvider>
           <ReloadPrompt />
           
-          {/* Toaster Global Configurado */}
           <Toaster 
             position="top-center"
             toastOptions={{
               duration: 4000,
-              style: {
-                background: '#333',
-                color: '#fff',
-                borderRadius: '8px',
-                fontSize: '14px',
-                maxWidth: '90vw',
-              },
-              success: {
-                style: {
-                  background: '#ecfdf5', // green-50
-                  color: '#047857',      // green-700
-                  border: '1px solid #a7f3d0',
-                },
-                iconTheme: {
-                  primary: '#059669',
-                  secondary: '#ecfdf5',
-                },
-              },
-              error: {
-                style: {
-                  background: '#fef2f2', // red-50
-                  color: '#b91c1c',      // red-700
-                  border: '1px solid #fecaca',
-                },
-                iconTheme: {
-                  primary: '#dc2626',
-                  secondary: '#fef2f2',
-                },
-              },
+              style: { background: '#333', color: '#fff', borderRadius: '8px', fontSize: '14px', maxWidth: '90vw' },
+              success: { style: { background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }, iconTheme: { primary: '#059669', secondary: '#ecfdf5' } },
+              error: { style: { background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' }, iconTheme: { primary: '#dc2626', secondary: '#fef2f2' } },
             }}
           />
           
           <Routes>
-            {/* --- ROTAS PÚBLICAS --- */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/pending-approval" element={<PendingRoute><PendingApproval /></PendingRoute>} />
 
-            {/* --- ROTA DE ESPERA (Cadastro em Análise) --- */}
-            <Route path="/pending-approval" element={
-              <PendingRoute>
-                <PendingApproval />
-              </PendingRoute>
-            } />
-
-            {/* --- ÁREA DO MORADOR (Layout Padrão com Bottom Nav) --- */}
             <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
               <Route path="/" element={<Dashboard />} />
-              
-              {/* Módulos Principais da Navegação */}
               <Route path="/comunicacao" element={<Comunicacao />} />
               <Route path="/suporte" element={<Suporte />} />
               <Route path="/transparencia" element={<Despesas />} />
               <Route path="/perfil" element={<Profile />} />
-
-              {/* Sub-rotas e Funcionalidades Específicas */}
               <Route path="/faq" element={<FAQ />} />
               <Route path="/ocorrencias" element={<Ocorrencias />} />
               <Route path="/ocorrencias/nova" element={<NovaOcorrencia />} />
@@ -169,32 +122,22 @@ export default function App() {
               <Route path="/biblioteca" element={<Biblioteca />} />
               <Route path="/comunicados" element={<Comunicados />} />
               <Route path="/votacoes" element={<Votacoes />} />
-              
-              {/* Redirecionamentos de legado/compatibilidade */}
               <Route path="/despesas" element={<Navigate to="/transparencia" replace />} />
             </Route>
 
-            {/* --- ÁREA ADMINISTRATIVA (Layout Admin com Sidebar) --- */}
             <Route path="/admin" element={<PrivateRoute adminOnly><AdminLayout /></PrivateRoute>}>
               <Route index element={<AdminDashboard />} />
-              
-              {/* Gestão */}
               <Route path="usuarios" element={<UserManagement />} />
               <Route path="condominios" element={<CondominioManagement />} />
-              
-              {/* Operacional */}
               <Route path="ocorrencias" element={<OcorrenciasManagement />} />
               <Route path="comunicados" element={<ComunicadosManagement />} />
               <Route path="votacoes" element={<VotacoesManagement />} />
               <Route path="financeiro" element={<FinanceiroManagement />} />
-              
-              {/* Inteligência Artificial */}
               <Route path="ia" element={<KnowledgeBaseManagement />} />
+              <Route path="marketplace" element={<MarketplaceManagement />} /> 
             </Route>
 
-            {/* Fallback para rotas não encontradas - Redireciona para Home */}
             <Route path="*" element={<Navigate to="/" replace />} />
-
           </Routes>
         </ThemeProvider>
       </AuthProvider>

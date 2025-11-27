@@ -4,15 +4,13 @@ import { versixTheme } from '../../config/theme-versix'
 
 export default function AdminSidebar({ onClose }: { onClose?: () => void }) {
   const location = useLocation()
-  const { signOut, isAdmin, isSindico } = useAuth() // Importando isSindico
+  const { signOut, isAdmin, isSindico } = useAuth() 
   
   const isActive = (path: string) => location.pathname === path
 
-  // Definição do menu com lógica de permissões
   const menuItems = [
     { path: '/admin', label: 'Visão Geral', icon: '📊', show: true },
     
-    // Apenas Super Admins devem ver a gestão de condomínios (Multi-tenant)
     { path: '/admin/condominios', label: 'Condomínios', icon: '🏢', show: isAdmin },
     
     { path: '/admin/usuarios', label: 'Gestão de Acesso', icon: '👥', show: true },
@@ -21,7 +19,9 @@ export default function AdminSidebar({ onClose }: { onClose?: () => void }) {
     { path: '/admin/votacoes', label: 'Assembleia', icon: '🗳️', show: true },
     { path: '/admin/financeiro', label: 'Financeiro', icon: '💰', show: true },
     
-    // Inteligência Artificial (Admin e Síndico podem ver)
+    // Novo Item de Marketplace
+    { path: '/admin/marketplace', label: 'Gestão Marketplace', icon: '🛍️', show: isAdmin },
+    
     { path: '/admin/ia', label: 'Base de Conhecimento', icon: '🧠', show: isAdmin || isSindico },
   ]
 
