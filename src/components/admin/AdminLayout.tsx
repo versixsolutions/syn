@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Outlet, Navigate } from 'react-router-dom'
+import { Outlet, Navigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { versixTheme } from '../../config/theme-versix'
 import AdminSidebar from './AdminSidebar'
 import LoadingSpinner from '../LoadingSpinner'
 import { AdminProvider, useAdmin } from '../../contexts/AdminContext'
 
-// Componente interno que consome o contexto (precisa estar dentro do Provider)
+// Componente interno que consome o contexto
 function AdminLayoutContent() {
   const { profile } = useAuth()
   const { 
@@ -16,8 +16,12 @@ function AdminLayoutContent() {
     selectedCondominio
   } = useAdmin()
   
+  const location = useLocation() // Hook para saber onde estamos
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const isAdmin = profile?.role === 'admin'
+
+  // Verifica se estamos na raiz do painel admin
+  const isDashboard = location.pathname === '/admin' || location.pathname === '/admin/'
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex">
@@ -45,7 +49,7 @@ function AdminLayoutContent() {
 
       <div className="flex-1 flex flex-col lg:ml-64 min-h-screen transition-all duration-300 min-w-0 overflow-x-hidden">
         
-        {/* Topbar Administrativa com SELETOR GLOBAL */}
+        {/* Topbar Administrativa */}
         <header className="bg-white border-b border-gray-200 sticky top-0 z-30 px-4 py-3 shadow-sm">
           <div className="flex items-center justify-between max-w-7xl mx-auto w-full">
             <div className="flex items-center gap-4 flex-1">
@@ -58,25 +62,26 @@ function AdminLayoutContent() {
               
               {/* SELETOR GLOBAL DE CONDOMÍNIO */}
               {isAdmin ? (
-                <div className="relative group animate-fade-in">
+                <div className={`relative group animate-fade-in transition-opacity ${isDashboard && !selectedCondominioId ? 'opacity-75 hover:opacity-100' : 'opacity-100'}`}>
                   <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1 pr-3 border border-slate-200 hover:border-blue-300 transition-colors">
                     <div className="bg-slate-800 text-white p-1.5 rounded text-xs font-bold shadow-sm">
                       🏢
                     </div>
                     <select
                       value={selectedCondominioId || ''}
-                      onChange={(e) => setSelectedCondominioId(e.target.value)}
+                      onChange={(e) => setSelectedCondominioId(e.target.value || null)}
                       className="bg-transparent border-none text-sm font-bold text-slate-700 focus:ring-0 cursor-pointer min-w-[200px] outline-none"
                     >
-                      <option value="" disabled>Selecione um Condomínio...</option>
+                      <option value="">Visão Global (Nenhum)</option>
                       {condominios.map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
                   </div>
-                  {!selectedCondominioId && (
+                  {/* Alerta flutuante só aparece se NÃO for dashboard e não tiver seleção */}
+                  {!selectedCondominioId && !isDashboard && (
                     <div className="absolute top-12 left-0 bg-red-500 text-white text-xs px-3 py-1 rounded shadow-lg animate-bounce whitespace-nowrap z-50">
-                      👆 Selecione aqui para começar
+                      👆 Selecione aqui para gerenciar
                     </div>
                   )}
                 </div>
@@ -106,15 +111,29 @@ function AdminLayoutContent() {
           </div>
         </header>
 
-        {/* Page Content - Bloqueia se Admin não selecionou condomínio */}
+        {/* Page Content */}
         <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full animate-fade-in">
-          {isAdmin && !selectedCondominioId ? (
-            <div className="flex flex-col items-center justify-center h-[60vh] text-center p-4">
+          
+          {/* LÓGICA CORRIGIDA:
+             Bloqueia APENAS se:
+             1. É Admin
+             2. NÃO tem condomínio selecionado
+             3. E NÃO está no Dashboard Global (/admin)
+          */}
+          {isAdmin && !selectedCondominioId && !isDashboard ? (
+            <div className="flex flex-col items-center justify-center h-[60vh] text-center p-4 bg-white/50 rounded-2xl border border-dashed border-gray-300 m-4">
               <div className="text-6xl mb-6 animate-bounce">👆</div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Nenhum condomínio selecionado</h2>
-              <p className="text-gray-500 max-w-md mx-auto">
-                Para garantir a segurança e organização dos dados, selecione no topo da página qual condomínio você deseja gerenciar agora.
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Selecione um Condomínio</h2>
+              <p className="text-gray-500 max-w-md mx-auto mb-6">
+                Para acessar este módulo operacional (como Usuários ou Financeiro), você precisa definir qual cliente está gerenciando no momento.
               </p>
+              
+              <Link 
+                to="/admin"
+                className="inline-flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-bold hover:bg-gray-50 transition shadow-sm"
+              >
+                <span>🔙</span> Voltar para Visão Global
+              </Link>
             </div>
           ) : (
             <Outlet />
@@ -126,7 +145,6 @@ function AdminLayoutContent() {
   )
 }
 
-// Componente Principal que envelopa tudo
 export default function AdminLayout() {
   const { user, loading, canManage } = useAuth()
 
