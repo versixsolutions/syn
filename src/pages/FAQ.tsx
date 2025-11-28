@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import PageLayout from '../components/PageLayout'
 import LoadingSpinner from '../components/LoadingSpinner'
 import EmptyState from '../components/EmptyState'
@@ -32,12 +34,12 @@ function getCategoryStyle(category: string | null) {
 }
 
 export default function FAQ() {
+  const { canManage } = useAuth()
+  const navigate = useNavigate()
   const [faqs, setFaqs] = useState<FAQ[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  
-  // Estado para controlar o Chatbot
   const [isChatOpen, setIsChatOpen] = useState(false)
 
   useEffect(() => { loadFAQs() }, [])
@@ -62,74 +64,73 @@ export default function FAQ() {
   if (loading) return <LoadingSpinner />
 
   return (
-    <PageLayout title="Perguntas Frequentes" subtitle="Tire suas dúvidas" icon="❓">
+    <PageLayout title="Perguntas Frequentes" subtitle="Tire suas dúvidas sobre o condomínio" icon="❓">
       
-      {/* --- 1. CARDS DE RESUMO (LAYOUT COMPACTO EM LINHA) --- */}
-      {/* grid-cols-2 em todas as telas para ficarem lado a lado e menores */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
+      {/* --- Header de Ações --- */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
         
-        {/* Card Estatística */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 flex flex-col justify-center h-24">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Artigos</p>
-          <div className="flex items-baseline gap-1">
-            <p className="text-2xl font-bold text-primary">{faqs.length}</p>
-            <span className="text-xs text-gray-400">total</span>
-          </div>
+        {/* Barra de Busca */}
+        <div className="relative flex-1">
+          <input 
+            type="text" 
+            value={searchTerm} 
+            onChange={e => setSearchTerm(e.target.value)} 
+            placeholder="Buscar dúvida..." 
+            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent text-sm shadow-sm" 
+          />
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
         </div>
 
-        {/* Card Assistente Virtual (Clicável) */}
-        <div 
-          onClick={() => setIsChatOpen(true)}
-          className="bg-gradient-to-br from-purple-50 to-white rounded-xl shadow-sm border border-purple-100 p-3 flex items-center gap-3 cursor-pointer hover:shadow-md transition h-24 relative group"
-        >
-          <div className="w-10 h-10 rounded-full bg-purple-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:scale-110 transition-transform">
-            🤖
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-gray-900 text-xs leading-tight mb-0.5">Assistente Virtual</h3>
-            <p className="text-[10px] text-purple-600 font-semibold">Toque para falar</p>
-          </div>
-          {/* Indicador de pulso */}
-          <span className="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-        </div>
-
+        {/* Botão Importar (Apenas Admin/Síndico) */}
+        {canManage && (
+          <button 
+            onClick={() => navigate('/admin/faq-import')}
+            className="bg-white border border-gray-300 text-gray-700 px-4 py-3 rounded-xl text-sm font-bold hover:bg-gray-50 transition flex items-center justify-center gap-2 shadow-sm shrink-0"
+          >
+            <span>📥</span> <span className="hidden sm:inline">Importar CSV</span>
+          </button>
+        )}
+      </div>
+      
+      {/* --- Filtros de Categoria (Scroll Horizontal) --- */}
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
+        <button onClick={() => setSelectedCategory(null)} className={`px-4 py-2 rounded-full text-xs font-bold border transition shrink-0 ${!selectedCategory ? 'bg-gray-800 text-white border-gray-800 shadow-md' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>Todas</button>
+        {Object.keys(CATEGORIES).filter(k => k !== 'default').map(key => (
+          <button key={key} onClick={() => setSelectedCategory(key)} className={`px-4 py-2 rounded-full text-xs font-bold border transition shrink-0 flex items-center gap-1 ${selectedCategory === key ? 'bg-primary text-white border-primary shadow-md' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+            <span>{CATEGORIES[key].icon}</span> {CATEGORIES[key].label}
+          </button>
+        ))}
       </div>
 
-      {/* --- 2. BARRA DE FILTROS + BUSCA --- */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 sticky top-20 z-30 space-y-4">
-        <div className="relative">
-          <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Buscar dúvida..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm" />
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-        </div>
-        
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide border-t border-gray-100 pt-3">
-          <button onClick={() => setSelectedCategory(null)} className={`px-3 py-1 rounded-full text-xs font-bold border transition shrink-0 ${!selectedCategory ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>Todas</button>
-          {Object.keys(CATEGORIES).filter(k => k !== 'default').map(key => (
-            <button key={key} onClick={() => setSelectedCategory(key)} className={`px-3 py-1 rounded-full text-xs font-bold border transition shrink-0 flex items-center gap-1 ${selectedCategory === key ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
-              <span>{CATEGORIES[key].icon}</span> {CATEGORIES[key].label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* --- 3. LISTA DE CARDS --- */}
+      {/* --- Lista de FAQs --- */}
       {filtered.length > 0 ? (
-        <div className="space-y-3">
+        <div className="space-y-3 pb-20">
           {filtered.map(f => {
             const style = getCategoryStyle(f.category)
             return (
-              <div key={f.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition">
-                <div className="p-4">
+              <div key={f.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition group">
+                <div className="p-4 sm:p-5">
                   <div className="flex items-start gap-3">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-base ${style.iconBg}`}>
                       {style.icon}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase mb-1 ${style.color}`}>
-                        {style.label}
-                      </span>
-                      <h3 className="font-bold text-gray-900 mb-1 text-sm">{f.question}</h3>
-                      <p className="text-xs text-gray-600 whitespace-pre-line leading-relaxed">{f.answer}</p>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${style.color}`}>
+                          {style.label}
+                        </span>
+                        {/* Botão de editar rápido para admin (futuro) */}
+                        {/* {canManage && <button className="text-gray-300 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>} */}
+                      </div>
+                      <h3 className="font-bold text-gray-900 mb-2 text-sm sm:text-base">{f.question}</h3>
+                      <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        {f.answer}
+                      </p>
+                      {f.article_reference && (
+                        <p className="text-[10px] text-gray-400 mt-2 font-medium uppercase tracking-wider">
+                          Fonte: {f.article_reference}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -138,10 +139,29 @@ export default function FAQ() {
           })}
         </div>
       ) : (
-        <EmptyState icon="🔍" title="Nada encontrado" description="Tente outro termo ou use o Assistente Virtual." action={{ label: 'Limpar', onClick: () => { setSearchTerm(''); setSelectedCategory(null) } }} />
+        <EmptyState 
+          icon="🔍" 
+          title="Nada encontrado" 
+          description="Tente outro termo ou use nossa Assistente Virtual." 
+          action={{ label: 'Limpar Filtros', onClick: () => { setSearchTerm(''); setSelectedCategory(null) } }} 
+        />
       )}
 
-      {/* Componente de Chat controlado pela página */}
+      {/* --- FAB (Floating Action Button) para Chatbot --- */}
+      {/* Substitui o card grande por um botão flutuante amigável */}
+      <button
+        onClick={() => setIsChatOpen(true)}
+        className="fixed bottom-6 right-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white w-14 h-14 rounded-full shadow-lg hover:shadow-xl flex items-center justify-center transition transform hover:scale-110 z-50 group border-2 border-white"
+        title="Falar com Norma"
+      >
+        <span className="text-2xl group-hover:animate-pulse">🤖</span>
+        {/* Tooltip Mobile */}
+        <span className="absolute right-full mr-3 bg-gray-900 text-white text-xs font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none">
+          Ajuda com IA
+        </span>
+      </button>
+
+      {/* Componente de Chat */}
       <Chatbot isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
       
     </PageLayout>
