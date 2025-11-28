@@ -3,15 +3,11 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useAdmin } from '../../contexts/AdminContext'
 import { formatCurrency, formatDate } from '../../lib/utils'
+import { extractTextFromPDF } from '../../lib/pdfUtils' // <--- IMPORTANTE: Usando a função centralizada
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
 import Modal from '../../components/ui/Modal'
 import toast from 'react-hot-toast'
-import * as pdfjsLib from 'pdfjs-dist'
-
-// --- CORREÇÃO AQUI ---
-// Configura o worker do PDF.js usando unpkg para garantir compatibilidade de versão e extensão .mjs
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
 
 interface Despesa {
   id: string
@@ -135,19 +131,8 @@ export default function FinanceiroManagement() {
     const toastId = toast.loading('Lendo demonstrativo...')
 
     try {
-      // 1. Extração Local do Texto
-      const arrayBuffer = await file.arrayBuffer()
-      
-      // Carrega o PDF usando o worker configurado corretamente
-      const pdf = await pdfjsLib.getDocument(arrayBuffer).promise
-      let fullText = ''
-
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i)
-        const textContent = await page.getTextContent()
-        const pageText = textContent.items.map((item: any) => item.str).join(' ')
-        fullText += `\n--- PÁGINA ${i} ---\n${pageText}`
-      }
+      // 1. Extração Local do Texto (Usando função centralizada e corrigida)
+      const fullText = await extractTextFromPDF(file)
 
       // 2. Envio para Edge Function (IA)
       toast.loading('IA analisando tabelas...', { id: toastId })
@@ -172,12 +157,7 @@ export default function FinanceiroManagement() {
 
     } catch (err: any) {
       console.error(err)
-      // Tratamento específico para erro de worker
-      if (err.message.includes('fake worker')) {
-         toast.error('Erro interno no leitor de PDF. Tente recarregar a página.', { id: toastId })
-      } else {
-         toast.error(`Falha: ${err.message}`, { id: toastId })
-      }
+      toast.error(`Falha: ${err.message}`, { id: toastId })
     } finally {
       setIsProcessingPdf(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -245,7 +225,6 @@ export default function FinanceiroManagement() {
         </div>
         
         <div className="flex items-center gap-3">
-            {/* Botão Importar agora abre o Modal */}
             <button
               onClick={() => setIsImportModalOpen(true)}
               className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-bold hover:bg-gray-50 transition flex items-center gap-2 shadow-sm"
