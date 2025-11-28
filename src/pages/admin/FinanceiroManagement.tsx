@@ -9,10 +9,8 @@ import Modal from '../../components/ui/Modal'
 import toast from 'react-hot-toast'
 import * as pdfjsLib from 'pdfjs-dist'
 
-// ------------------------------------------------------------------
-// CORREÇÃO DO ERRO PDF WORKER
-// Usamos o UNPKG para garantir a versão correta do arquivo .mjs
-// ------------------------------------------------------------------
+// --- CORREÇÃO AQUI ---
+// Configura o worker do PDF.js usando unpkg para garantir compatibilidade de versão e extensão .mjs
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
 
 interface Despesa {
@@ -49,7 +47,7 @@ export default function FinanceiroManagement() {
     isPaid: false
   })
 
-  // Estados do Modal de IMPORTAÇÃO (Novo)
+  // Estados do Modal de IMPORTAÇÃO
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [importStep, setImportStep] = useState<'upload' | 'preview' | 'saving'>('upload')
   const [isProcessingPdf, setIsProcessingPdf] = useState(false)
@@ -139,6 +137,8 @@ export default function FinanceiroManagement() {
     try {
       // 1. Extração Local do Texto
       const arrayBuffer = await file.arrayBuffer()
+      
+      // Carrega o PDF usando o worker configurado corretamente
       const pdf = await pdfjsLib.getDocument(arrayBuffer).promise
       let fullText = ''
 
@@ -172,7 +172,12 @@ export default function FinanceiroManagement() {
 
     } catch (err: any) {
       console.error(err)
-      toast.error(`Falha: ${err.message}`, { id: toastId })
+      // Tratamento específico para erro de worker
+      if (err.message.includes('fake worker')) {
+         toast.error('Erro interno no leitor de PDF. Tente recarregar a página.', { id: toastId })
+      } else {
+         toast.error(`Falha: ${err.message}`, { id: toastId })
+      }
     } finally {
       setIsProcessingPdf(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
