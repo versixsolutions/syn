@@ -100,9 +100,8 @@ serve(async (req) => {
     console.log(`🔍 Query: "${query}"`)
     console.log(`🏢 Condomínio: ${filter_condominio_id}`)
 
-    // ===== BUSCA SIMPLIFICADA (MVP - SEM EMBEDDINGS DA QUERY) =====
-    // Usar scroll para buscar todos os documentos e filtrar manualmente
-    console.log('🔎 Buscando documentos relevantes...')
+    // ===== BUSCA DE DOCUMENTOS (QDRANT) =====
+    console.log('🔎 Buscando documentos na Biblioteca...')
 
     const scrollResp = await fetch(
       `${QDRANT_URL}/collections/${COLLECTION_NAME}/points/scroll`,
@@ -138,6 +137,29 @@ serve(async (req) => {
 
     console.log(`📄 Total de documentos encontrados: ${allPoints.length}`)
 
+    // ===== BUSCA DE FAQs =====
+    console.log('❓ Buscando FAQs relevantes...')
+    let faqs: any[] = []
+    
+    if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+      try {
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+        const { data: faqData, error: faqError } = await supabase
+          .from('faqs')
+          .select('id, question, answer, category_id, created_at')
+          .order('created_at', { ascending: false })
+        
+        if (!faqError && faqData) {
+          faqs = faqData as any[]
+          console.log(`✅ Total de FAQs encontradas: ${faqs.length}`)
+        } else {
+          console.warn('⚠️ Erro ao buscar FAQs:', faqError?.message)
+        }
+      } catch (err) {
+        console.warn('⚠️ Erro ao conectar com FAQs:', err)
+      }
+    }
+
     // ===== FILTRAR MANUALMENTE POR PALAVRAS-CHAVE (MVP) =====
     // Tokenizar query e normalizar
     const queryWords = query
@@ -145,27 +167,27 @@ serve(async (req) => {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '') // Remove acentos
       .split(/\s+/)
-      .filter((w) => w.length > 2) // Filtrar palavras muito curtas
+      .filter((w: string) => w.length > 2) // Filtrar palavras muito curtas
 
     console.log(`🔍 Buscando por: ${queryWords.join(', ')}`)
 
     // Calcular score para cada documento
     const rankedResults = allPoints
-      .map((point) => {
+      .map((point: any) => {
         const content = point.payload.content.toLowerCase()
         const title = point.payload.title.toLowerCase()
         
         let score = 0
         
         // Score por palavra no título (peso maior)
-        queryWords.forEach((word) => {
+        queryWords.forEach((word: string) => {
           if (title.includes(word)) {
             score += 5
           }
         })
         
         // Score por palavra no conteúdo
-        queryWords.forEach((word) => {
+        queryWords.forEach((word: string) => {
           const matches = (content.match(new RegExp(word, 'g')) || []).length
           score += matches
         })
@@ -181,18 +203,69 @@ serve(async (req) => {
           score += 15
         }
         
-        return { ...point, score }
+        return { ...point, score, type: 'document' }
       })
-      .filter((r) => r.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 3) // Top 3 resultados
+      .filter((r: any) => r.score > 0)
+      .sort((a: any, b: any) => b.score - a.score)
+      .slice(0, 2) // Top 2 documentos
 
-    console.log(`📊 Encontrados ${rankedResults.length} resultados relevantes`)
+    // ===== RANKING DE FAQs =====
+    console.log('⭐ Calculando relevância de FAQs...')
+    const rankedFAQs = faqs
+      .map((faq: any) => {
+        const question = faq.question.toLowerCase()
+        const answer = faq.answer.toLowerCase()
+        
+        let score = 0
+        
+        // Score por palavra na pergunta (peso maior)
+        queryWords.forEach((word: string) => {
+          if (question.includes(word)) {
+            score += 6
+          }
+        })
+        
+        // Score por palavra na resposta
+        queryWords.forEach((word: string) => {
+          const matches = (answer.match(new RegExp(word, 'g')) || []).length
+          score += matches * 0.5
+        })
+        
+        // Boost se contém query exata
+        const normalizedQuery = query.toLowerCase()
+        if (question.includes(normalizedQuery)) {
+          score += 20
+        }
+        
+        if (answer.includes(normalizedQuery)) {
+          score += 10
+        }
+        
+        return { 
+          ...faq, 
+          score,
+          type: 'faq',
+          payload: {
+            title: faq.question,
+            content: faq.answer
+          }
+        }
+      })
+      .filter((r: any) => r.score > 0)
+      .sort((a: any, b: any) => b.score - a.score)
+      .slice(0, 2) // Top 2 FAQs
 
-    if (rankedResults.length === 0) {
+    // ===== COMBINAR RESULTADOS =====
+    const allResults = [...rankedResults, ...rankedFAQs]
+      .sort((a: any, b: any) => b.score - a.score)
+      .slice(0, 4) // Top 4 resultados combinados
+
+    console.log(`📊 Encontrados ${allResults.length} resultados (${rankedResults.length} docs, ${rankedFAQs.length} FAQs)`)
+
+    if (allResults.length === 0) {
       return new Response(
         JSON.stringify({
-          answer: 'Não encontrei informações sobre isso nos documentos do condomínio. Você pode reformular a pergunta ou verificar se os documentos relevantes foram adicionados na Biblioteca.',
+          answer: 'Não encontrei informações sobre isso nos documentos ou FAQs do condomínio. Você pode reformular a pergunta ou verificar se os documentos relevantes foram adicionados na Biblioteca.',
           sources: []
         }),
         {
@@ -202,14 +275,15 @@ serve(async (req) => {
     }
 
     // Log de debug
-    if (rankedResults.length > 0) {
-      console.log(`⭐ Top resultado: "${rankedResults[0].payload.title}" (score=${rankedResults[0].score})`)
+    if (allResults.length > 0) {
+      console.log(`⭐ Top resultado: "${allResults[0].payload.title}" [${allResults[0].type}] (score=${allResults[0].score})`)
     }
 
     // ===== MONTAR CONTEXTO PARA GROQ =====
-    const contextParts = rankedResults.map((r, i) => {
+    const contextParts = allResults.map((r: any, i: number) => {
       const source = r.payload.title || 'Documento'
-      return `[Fonte ${i + 1}: ${source}]\n${r.payload.content}`
+      const type = r.type === 'faq' ? '❓ FAQ' : '📄 Documento'
+      return `[Fonte ${i + 1} - ${type}: ${source}]\n${r.payload.content}`
     })
 
     const contextText = contextParts.join('\n\n---\n\n')
@@ -224,8 +298,9 @@ serve(async (req) => {
 2. Se a informação NÃO estiver no contexto, diga: "Não encontrei essa informação nos documentos disponíveis"
 3. Seja concisa e objetiva (máximo 150 palavras)
 4. Use bullets quando listar múltiplos itens
-5. Cite a fonte quando possível (ex: "Segundo o Regimento Interno...")
+5. Cite a fonte quando possível (ex: "Segundo o Regimento Interno..." ou "Conforme a FAQ...")
 6. Fale em português do Brasil, de forma profissional mas acessível
+7. Priorize informações de FAQs quando forem mais claras e objetivas
 
 **CONTEXTO:**
 ${contextText}
@@ -267,8 +342,9 @@ ${contextText}
     return new Response(
       JSON.stringify({
         answer,
-        sources: rankedResults.map((r) => ({
+        sources: allResults.map((r: any) => ({
           title: r.payload.title,
+          type: r.type,
           score: r.score,
           excerpt: r.payload.content.substring(0, 150) + '...'
         }))
@@ -278,11 +354,12 @@ ${contextText}
       }
     )
 
-  } catch (error) {
-    console.error('❌ Erro:', error)
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('❌ Erro:', errorMessage)
     return new Response(
       JSON.stringify({
-        answer: `Erro técnico: ${error.message}. Por favor, tente novamente.`,
+        answer: `Erro técnico: ${errorMessage}. Por favor, tente novamente.`,
         sources: []
       }),
       {
