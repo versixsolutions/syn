@@ -14,15 +14,23 @@
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "*"
+          "value": "https://norma.versixsolutions.com.br, https://app.versixsolutions.com.br, http://localhost:5173"
         },
         {
           "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, PUT, DELETE, OPTIONS"
+          "value": "GET, POST, PUT, DELETE"
         },
         {
           "key": "Access-Control-Allow-Headers",
-          "value": "X-Requested-With, Content-Type, Authorization"
+          "value": "Content-Type, Authorization"
+        },
+        {
+          "key": "Access-Control-Max-Age",
+          "value": "3600"
+        },
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
         }
       ]
     },
