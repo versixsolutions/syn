@@ -71,15 +71,15 @@ $$ LANGUAGE plpgsql;
 -- ✅ RPC PARA ATIVIDADE RECENTE
 CREATE OR REPLACE FUNCTION get_recent_activity(limit_count INT DEFAULT 20)
 RETURNS TABLE(
-  type TEXT,
+  activity_type TEXT,
   description TEXT,
-  timestamp TIMESTAMP,
+  activity_timestamp TIMESTAMP,
   condominio_name TEXT
 ) AS $$
 BEGIN
   RETURN QUERY
   (
-    SELECT 'ocorrencia' as type, CONCAT('Ocorrência: ', o.title) as description, o.created_at as timestamp, c.name
+    SELECT 'ocorrencia'::TEXT as activity_type, CONCAT('Ocorrência: ', o.title) as description, o.created_at as activity_timestamp, c.name
     FROM ocorrencias o
     LEFT JOIN condominios c ON c.id = o.condominio_id
     ORDER BY o.created_at DESC
@@ -87,7 +87,7 @@ BEGIN
   )
   UNION ALL
   (
-    SELECT 'votacao' as type, CONCAT('Votação: ', v.title) as description, v.created_at as timestamp, c.name
+    SELECT 'votacao'::TEXT as activity_type, CONCAT('Votação: ', v.title) as description, v.created_at as activity_timestamp, c.name
     FROM votacoes v
     LEFT JOIN condominios c ON c.id = v.condominio_id
     ORDER BY v.created_at DESC
@@ -95,14 +95,14 @@ BEGIN
   )
   UNION ALL
   (
-    SELECT 'usuario' as type, CONCAT('Novo usuário: ', u.full_name) as description, u.created_at as timestamp, c.name
+    SELECT 'usuario'::TEXT as activity_type, CONCAT('Novo usuário: ', u.full_name) as description, u.created_at as activity_timestamp, c.name
     FROM users u
     LEFT JOIN condominios c ON c.id = u.condominio_id
     WHERE u.role != 'pending'
     ORDER BY u.created_at DESC
     LIMIT limit_count
   )
-  ORDER BY timestamp DESC
+  ORDER BY activity_timestamp DESC
   LIMIT limit_count;
 END;
 $$ LANGUAGE plpgsql;
