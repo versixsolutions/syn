@@ -69,83 +69,42 @@ export default function AdminDashboard() {
     try {
       setLoading(true)
 
-      // 1. Buscar todos os condomínios
-      const { data: condominios, error: condError } = await supabase
+      // ✅ OTIMIZAÇÃO: Usar RPC ÚNICA em lugar de 40 queries
+      const { data: healthData, error: healthError } = await supabase
+        .rpc('get_condominios_health')
+
+      if (healthError) throw healthError
+
+      setCondominioHealth(healthData || [])
+
+      // ✅ Calcular totais globais (dados já agregados pelo RPC)
+      const totalUsers = (healthData || []).reduce((acc, curr) => acc + Number(curr.total_users), 0)
+      const totalPending = (healthData || []).reduce((acc, curr) => acc + Number(curr.pending_users), 0)
+      const totalOpenIssues = (healthData || []).reduce((acc, curr) => acc + Number(curr.open_issues), 0)
+
+      // ✅ Contar condomínios
+      const { count: totalCondominios } = await supabase
         .from('condominios')
-        .select('id, name, slug, created_at')
-        .order('created_at', { ascending: false })
+        .select('*', { count: 'exact', head: true })
 
-      if (condError) throw condError
-
-      // 2. Métricas vitais (Parallel Queries)
-      const healthData = await Promise.all(
-        (condominios || []).map(async (cond) => {
-          // Usuários
-          const { count: totalUsers } = await supabase
-            .from('users')
-            .select('*', { count: 'exact', head: true })
-            .eq('condominio_id', cond.id)
-
-          // Pendentes
-          const { count: pendingUsers } = await supabase
-            .from('users')
-            .select('*', { count: 'exact', head: true })
-            .eq('condominio_id', cond.id)
-            .eq('role', 'pending')
-
-          // Ocorrências
-          const { count: openIssues } = await supabase
-            .from('ocorrencias')
-            .select('*', { count: 'exact', head: true })
-            .eq('condominio_id', cond.id)
-            .in('status', ['aberto', 'em_andamento'])
-
-          // Votações
-          const now = new Date().toISOString()
-          const { count: activePolls } = await supabase
-            .from('votacoes')
-            .select('*', { count: 'exact', head: true })
-            .eq('condominio_id', cond.id)
-            .gt('end_date', now)
-
-          return {
-            id: cond.id,
-            name: cond.name,
-            slug: cond.slug,
-            total_users: totalUsers || 0,
-            pending_users: pendingUsers || 0,
-            open_issues: openIssues || 0,
-            active_polls: activePolls || 0
-          }
+      // ✅ Volume Financeiro Global (com RPC)
+      const { data: financialData } = await supabase
+        .rpc('get_financial_summary', {
+          start_date: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
         })
-      )
 
-      setCondominioHealth(healthData)
-
-      // 3. Calcular totais globais
-      const totalUsers = healthData.reduce((acc, curr) => acc + curr.total_users, 0)
-      const totalPending = healthData.reduce((acc, curr) => acc + curr.pending_users, 0)
-      const totalOpenIssues = healthData.reduce((acc, curr) => acc + curr.open_issues, 0)
-
-      // 4. Volume Financeiro Global (Mês Atual)
-      const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
-      const { data: despesas } = await supabase
-        .from('despesas')
-        .select('amount')
-        .gte('due_date', startOfMonth)
-      
-      const financialVolume = despesas?.reduce((acc, curr) => acc + Number(curr.amount), 0) || 0
+      const financialVolume = financialData?.[0]?.total_amount || 0
 
       setStats({
-        totalCondominios: condominios?.length || 0,
+        totalCondominios: totalCondominios || 0,
         totalUsers,
         totalPending,
         totalOpenIssues,
-        financialVolume
+        financialVolume: Number(financialVolume)
       })
 
     } catch (error) {
-      console.error('Erro no dashboard:', error)
+      console.error('❌ Erro ao carregar dashboard:', error)
     } finally {
       setLoading(false)
     }

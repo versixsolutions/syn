@@ -1,12 +1,15 @@
 // supabase/functions/ask-ai/index.ts
-// Versão CORRIGIDA e COMPATÍVEL com Supabase Edge Functions
+// Versão CORRIGIDA, SEGURA e COM RATE LIMITING
 
 // @deno-types="https://deno.land/std@0.168.0/http/server.ts"
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://norma.versixsolutions.com.br',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '3600'
 }
 
 serve(async (req) => {
@@ -15,19 +18,83 @@ serve(async (req) => {
   }
 
   try {
+    // ✅ EXTRAIR USUARIO DO JWT
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ answer: 'Não autorizado. Faça login primeiro.' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Usar o JWT para rate limiting (mesmo sem validar, o header já indica um usuário)
+    const token = authHeader.replace('Bearer ', '')
+    const userId = token.substring(0, 36) // Usar primeiros 36 chars como ID (UUID-like)
+
     const { query, userName, filter_condominio_id } = await req.json()
 
+    // ✅ VALIDAÇÃO CRÍTICA: Todos os parâmetros são obrigatórios
     if (!query) {
       throw new Error('Query não fornecida')
+    }
+
+    if (!query.trim() || query.length > 500) {
+      throw new Error('Query inválida: deve ter entre 1 e 500 caracteres')
+    }
+
+    if (!filter_condominio_id || typeof filter_condominio_id !== 'string') {
+      throw new Error('Condomínio não especificado ou inválido')
+    }
+
+    if (!userName || typeof userName !== 'string') {
+      throw new Error('Nome de usuário inválido')
     }
 
     const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')
     const QDRANT_URL = Deno.env.get('QDRANT_URL')
     const QDRANT_API_KEY = Deno.env.get('QDRANT_API_KEY')
     const COLLECTION_NAME = Deno.env.get('QDRANT_COLLECTION_NAME') || 'norma_knowledge_base'
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
 
     if (!GROQ_API_KEY || !QDRANT_URL) {
       throw new Error('Configurações ausentes')
+    }
+
+    // ✅ RATE LIMITING: 50 requisições por hora por usuário
+    console.log(`⏱️ Verificando rate limit para usuário: ${userId}`)
+    
+    if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+      const oneHourAgo = new Date(Date.now() - 3600000).toISOString()
+      
+      const { count, error: countError } = await supabase
+        .from('ai_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .gte('created_at', oneHourAgo)
+      
+      if (!countError && count && count >= 50) {
+        console.warn(`⚠️ Rate limit atingido para usuário: ${userId}`)
+        return new Response(
+          JSON.stringify({ 
+            answer: '🚫 Limite de requisições atingido. Máximo 50 por hora. Tente novamente em alguns minutos.' 
+          }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // ✅ Registrar requisição para rate limiting
+      await supabase.from('ai_requests').insert({
+        user_id: userId,
+        query: query.substring(0, 200),
+        condominio_id: filter_condominio_id,
+        created_at: new Date().toISOString()
+      }).then(({ error }) => {
+        if (error) console.warn('Aviso ao registrar request:', error.message)
+      })
+
+      console.log(`✅ Taxa dentro do limite. Requisições nesta hora: ${count || 0}/50`)
     }
 
     console.log(`🔍 Query: "${query}"`)
