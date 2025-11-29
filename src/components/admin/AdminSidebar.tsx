@@ -18,7 +18,8 @@ export default function AdminSidebar({ onClose }: { onClose?: () => void }) {
     { path: '/admin/ocorrencias', label: 'Ocorrências', icon: '🚨', show: true },
     { path: '/admin/chamados', label: 'Chamados', icon: '💬', show: true },
     { path: '/admin/comunicados', label: 'Comunicados', icon: '📢', show: true },
-    { path: '/admin/votacoes', label: 'Assembleia', icon: '🗳️', show: true },
+    { path: '/admin/assembleias', label: 'Assembleias', icon: '🗳️', show: true },
+    { path: '/admin/votacoes', label: 'Votações (Legacy)', icon: '✅', show: false },
     { path: '/admin/financeiro', label: 'Financeiro', icon: '💰', show: true },
     
     { path: '/admin/marketplace', label: 'Gestão Marketplace', icon: '🛍️', show: isAdmin },

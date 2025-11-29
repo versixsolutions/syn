@@ -9,7 +9,11 @@
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "setup:qdrant": "tsx scripts/setup-qdrant.ts",
-    "migrate:qdrant": "tsx scripts/migrate-to-qdrant.ts"
+    "migrate:qdrant": "tsx scripts/migrate-to-qdrant.ts",
+    "seed:assembleia": "tsx scripts/seed-assembleia.ts",
+    "check:tables": "tsx scripts/check-assembleias-tables.ts",
+    "check:storage": "tsx scripts/check-storage-bucket.ts",
+    "check:all": "tsx scripts/check-assembleias-tables.ts && tsx scripts/check-storage-bucket.ts"
   },
   "dependencies": {
     "@sentry/react": "^10.27.0",
@@ -17,8 +21,10 @@
     "@supabase/supabase-js": "^2.39.0",
     "@xenova/transformers": "^2.17.2",
     "dotenv": "^17.2.3",
+    "jspdf": "^3.0.4",
     "openai": "^6.9.1",
     "pdfjs-dist": "^5.4.394",
+    "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.1",

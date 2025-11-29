@@ -3,7 +3,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import ReloadPrompt from './components/ReloadPrompt'
 import { Toaster } from 'react-hot-toast'
-import { useEffect } from 'react'
+import { useEffect, Suspense, lazy } from 'react'
 import * as Sentry from '@sentry/react'
 
 // --- PAGES PÚBLICAS ---
@@ -23,9 +23,14 @@ import Ocorrencias from './pages/Ocorrencias'
 import NovaOcorrencia from './pages/NovaOcorrencia'
 import NovoChamado from './pages/NovoChamado'
 import MeusChamados from './pages/MeusChamados'
-import Biblioteca from './pages/Biblioteca'
-import Comunicados from './pages/Comunicados'
-import Votacoes from './pages/Votacoes'
+const Biblioteca = lazy(() => import('./pages/Biblioteca'))
+const Comunicados = lazy(() => import('./pages/Comunicados'))
+const Votacoes = lazy(() => import('./pages/Votacoes'))
+const Transparencia = lazy(() => import('./pages/Transparencia'))
+const Financeiro = lazy(() => import('./pages/Financeiro'))
+const Assembleias = lazy(() => import('./pages/Assembleias'))
+const AssembleiaDetalhes = lazy(() => import('./pages/AssembleiaDetalhes'))
+const AssembleiaPresenca = lazy(() => import('./pages/AssembleiaPresenca'))
 
 // --- PAGES ADMIN (Layout Admin) ---
 import AdminLayout from './components/admin/AdminLayout'
@@ -41,6 +46,7 @@ import MarketplaceManagement from './pages/admin/MarketplaceManagement'
 import ChamadosManagement from './pages/admin/ChamadosManagement'
 import FAQImport from './pages/admin/FAQImport'
 import FinanceiroImport from './pages/admin/FinanceiroImport'
+const AdminAssembleias = lazy(() => import('./pages/admin/AdminAssembleias'))
 
 // --- COMPONENTES DE PROTEÇÃO DE ROTA ---
 
@@ -109,6 +115,7 @@ function AppRoutes() {
             }}
           />
           
+          <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-gray-500">Carregando...</div>}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
@@ -118,7 +125,11 @@ function AppRoutes() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/comunicacao" element={<Comunicacao />} />
               <Route path="/suporte" element={<Suporte />} />
-              <Route path="/transparencia" element={<Despesas />} />
+              <Route path="/transparencia" element={<Transparencia />} />
+              <Route path="/transparencia/financeiro" element={<Financeiro />} />
+              <Route path="/transparencia/assembleias" element={<Assembleias />} />
+              <Route path="/transparencia/assembleias/:id" element={<AssembleiaDetalhes />} />
+              <Route path="/transparencia/assembleias/:id/presenca" element={<AssembleiaPresenca />} />
               <Route path="/perfil" element={<Profile />} />
               <Route path="/faq" element={<FAQ />} />
               <Route path="/ocorrencias" element={<Ocorrencias />} />
@@ -128,7 +139,7 @@ function AppRoutes() {
               <Route path="/biblioteca" element={<Biblioteca />} />
               <Route path="/comunicados" element={<Comunicados />} />
               <Route path="/votacoes" element={<Votacoes />} />
-              <Route path="/despesas" element={<Navigate to="/transparencia" replace />} />
+              <Route path="/despesas" element={<Navigate to="/transparencia/financeiro" replace />} />
             </Route>
 
             <Route path="/admin" element={<PrivateRoute adminOnly><AdminLayout /></PrivateRoute>}>
@@ -141,6 +152,7 @@ function AppRoutes() {
               <Route path="votacoes" element={<VotacoesManagement />} />
               <Route path="financeiro" element={<FinanceiroManagement />} />
               <Route path="financeiro/import" element={<FinanceiroImport />} />
+              <Route path="assembleias" element={<AdminAssembleias />} />
               <Route path="ia" element={<KnowledgeBaseManagement />} />
               <Route path="marketplace" element={<MarketplaceManagement />} />
               <Route path="faq-import" element={<FAQImport />} />
@@ -148,6 +160,7 @@ function AppRoutes() {
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         </ThemeProvider>
       </AuthProvider>
     </Router>
