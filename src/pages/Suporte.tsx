@@ -37,10 +37,17 @@ export default function Suporte() {
       color: 'bg-indigo-50 text-indigo-600 border-indigo-100'
     },
     {
+      title: 'Meus Chamados',
+      description: 'Acompanhe suas mensagens com a administração.',
+      icon: '📞',
+      link: '/chamados',
+      color: 'bg-cyan-50 text-cyan-600 border-cyan-100'
+    },
+    {
       title: 'Falar com o Síndico',
       description: 'Envie uma mensagem direta para a administração.',
-      icon: '💬', // Ícone alterado para balão de fala
-      link: '/chamados/novo', // MUDANÇA AQUI: Link direto para a nova página
+      icon: '💬',
+      link: '/chamados/novo',
       color: 'bg-green-50 text-green-600 border-green-100'
     }
   ]

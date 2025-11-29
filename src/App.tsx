@@ -22,6 +22,7 @@ import FAQ from './pages/FAQ'
 import Ocorrencias from './pages/Ocorrencias'
 import NovaOcorrencia from './pages/NovaOcorrencia'
 import NovoChamado from './pages/NovoChamado'
+import MeusChamados from './pages/MeusChamados'
 import Biblioteca from './pages/Biblioteca'
 import Comunicados from './pages/Comunicados'
 import Votacoes from './pages/Votacoes'
@@ -37,8 +38,9 @@ import VotacoesManagement from './pages/admin/VotacoesManagement'
 import FinanceiroManagement from './pages/admin/FinanceiroManagement'
 import KnowledgeBaseManagement from './pages/admin/KnowledgeBaseManagement'
 import MarketplaceManagement from './pages/admin/MarketplaceManagement'
+import ChamadosManagement from './pages/admin/ChamadosManagement'
 import FAQImport from './pages/admin/FAQImport'
-import FinanceiroImport from './pages/admin/FinanceiroImport' // Nova Importação
+import FinanceiroImport from './pages/admin/FinanceiroImport'
 
 // --- COMPONENTES DE PROTEÇÃO DE ROTA ---
 
@@ -122,6 +124,7 @@ function AppRoutes() {
               <Route path="/ocorrencias" element={<Ocorrencias />} />
               <Route path="/ocorrencias/nova" element={<NovaOcorrencia />} />
               <Route path="/chamados/novo" element={<NovoChamado />} />
+              <Route path="/chamados" element={<MeusChamados />} />
               <Route path="/biblioteca" element={<Biblioteca />} />
               <Route path="/comunicados" element={<Comunicados />} />
               <Route path="/votacoes" element={<Votacoes />} />
@@ -133,12 +136,13 @@ function AppRoutes() {
               <Route path="usuarios" element={<UserManagement />} />
               <Route path="condominios" element={<CondominioManagement />} />
               <Route path="ocorrencias" element={<OcorrenciasManagement />} />
+              <Route path="chamados" element={<ChamadosManagement />} />
               <Route path="comunicados" element={<ComunicadosManagement />} />
               <Route path="votacoes" element={<VotacoesManagement />} />
               <Route path="financeiro" element={<FinanceiroManagement />} />
-              <Route path="financeiro/import" element={<FinanceiroImport />} /> {/* Nova Rota */}
+              <Route path="financeiro/import" element={<FinanceiroImport />} />
               <Route path="ia" element={<KnowledgeBaseManagement />} />
-              <Route path="marketplace" element={<MarketplaceManagement />} /> 
+              <Route path="marketplace" element={<MarketplaceManagement />} />
               <Route path="faq-import" element={<FAQImport />} />
             </Route>
 

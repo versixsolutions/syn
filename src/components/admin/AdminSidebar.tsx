@@ -16,6 +16,7 @@ export default function AdminSidebar({ onClose }: { onClose?: () => void }) {
     
     { path: '/admin/usuarios', label: 'Gestão de Acesso', icon: '👥', show: true },
     { path: '/admin/ocorrencias', label: 'Ocorrências', icon: '🚨', show: true },
+    { path: '/admin/chamados', label: 'Chamados', icon: '💬', show: true },
     { path: '/admin/comunicados', label: 'Comunicados', icon: '📢', show: true },
     { path: '/admin/votacoes', label: 'Assembleia', icon: '🗳️', show: true },
     { path: '/admin/financeiro', label: 'Financeiro', icon: '💰', show: true },

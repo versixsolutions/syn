@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
+import toast from 'react-hot-toast'
+import { useChamados } from '../hooks/useChamados'
 import PageLayout from '../components/PageLayout'
 import LoadingSpinner from '../components/LoadingSpinner'
 
@@ -16,7 +16,7 @@ const ASSUNTOS = [
 
 export default function NovoChamado() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { criarChamado } = useChamados()
   const [loading, setLoading] = useState(false)
   
   const [formData, setFormData] = useState({
@@ -26,26 +26,27 @@ export default function NovoChamado() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user) return
+    if (!formData.description.trim()) {
+      toast.error('❌ Digite uma mensagem')
+      return
+    }
+
     setLoading(true)
 
     try {
-      const { error } = await supabase.from('chamados').insert({
-        user_id: user.id,
-        // Identificação visual clara para o síndico saber a origem (Atualizado para Norma)
-        subject: `[Suporte] ${formData.subject}`, 
-        description: formData.description,
-        status: 'aberto'
+      const success = await criarChamado({
+        subject: formData.subject,
+        description: formData.description
       })
 
-      if (error) throw error
-
-      alert('Mensagem enviada com sucesso! Você será notificado quando o síndico responder.')
-      navigate('/perfil') // Volta para o perfil para ver o ticket criado
-
+      if (success) {
+        toast.success('✅ Mensagem enviada! O síndico logo responderá')
+        setFormData({ subject: 'Administrativo', description: '' })
+        setTimeout(() => navigate('/perfil'), 1500)
+      }
     } catch (error: any) {
       console.error('Erro ao enviar:', error)
-      alert('Erro ao enviar mensagem: ' + error.message)
+      toast.error('❌ Erro ao enviar: ' + error.message)
     } finally {
       setLoading(false)
     }
