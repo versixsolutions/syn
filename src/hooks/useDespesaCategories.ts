@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { DespesaCategory } from '../types'
 
+/**
+ * Hook para carregar categorias de despesas
+ * @function useDespesaCategories
+ * @returns {Object} Objeto contendo categories e loading
+ * @returns {DespesaCategory[]} categories - Array de categorias de despesa
+ * @returns {boolean} loading - Indica se os dados estão sendo carregados
+ * @example
+ * const { categories } = useDespesaCategories()
+ * return categories.map(c => <option>{c.name}</option>)
+ */
 export function useDespesaCategories() {
   const [categories, setCategories] = useState<DespesaCategory[]>([])
   const [loading, setLoading] = useState(true)

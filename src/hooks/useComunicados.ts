@@ -3,7 +3,18 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import type { ComunicadoWithDetails } from '../types'
 
-export function useComunicados(typeFilter?: string) {
+/**
+ * Hook para carregar comunicados (anúncios) do condomínio
+ * @function useComunicados
+ * @param {string} [typeFilter] - Filtro opcional por tipo de comunicado
+ * @returns {Object} Objeto contendo comunicados, unreadCount, loading e error
+ * @returns {ComunicadoWithDetails[]} comunicados - Array de comunicados com detalhes
+ * @returns {number} unreadCount - Número de comunicados não lidos
+ * @returns {boolean} loading - Indica se os dados estão sendo carregados
+ * @returns {Error|null} error - Erro durante o carregamento, se houver
+ * @example
+ * const { comunicados, unreadCount } = useComunicados('importante')
+ * console.log(`Você tem ${unreadCount} comunicados não lidos`)\n */\nexport function useComunicados(typeFilter?: string) {
   const [comunicados, setComunicados] = useState<ComunicadoWithDetails[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)

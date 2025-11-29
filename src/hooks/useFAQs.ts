@@ -1,6 +1,19 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
+/**
+ * Hook para carregar e filtrar FAQs por categoria e busca
+ * @function useFAQs
+ * @param {string} [searchQuery] - Query de busca opcional para filtrar FAQs
+ * @returns {Object} Objeto contendo dados, loading e erro
+ * @returns {FAQsByCategory[]} data - Array de categorias com FAQs agrupadas
+ * @returns {boolean} loading - Indica se os dados estão sendo carregados
+ * @returns {Error|null} error - Erro durante o carregamento, se houver
+ * @example
+ * const { data, loading } = useFAQs('mudança')
+ * data.map(cat => <h2>{cat.category.name}</h2>)
+ */
+
 interface FAQ {
   id: string
   question: string
@@ -23,6 +36,12 @@ interface FAQsByCategory {
   faqs: FAQ[]
 }
 
+/**
+ * Hook para carregar e filtrar FAQs por categoria e busca
+ * @returns {FAQsByCategory[]} data - Array de categorias com FAQs agrupadas
+ * @returns {boolean} loading - Indica se os dados estão sendo carregados
+ * @returns {Error|null} error - Erro durante o carregamento, se houver
+ */
 export function useFAQs(searchQuery?: string) {
   const [data, setData] = useState<FAQsByCategory[]>([])
   const [loading, setLoading] = useState(true)

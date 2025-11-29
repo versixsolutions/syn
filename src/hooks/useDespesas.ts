@@ -2,6 +2,17 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Despesa } from '../types'
 
+/**
+ * Hook para carregar despesas (finances) do condomínio
+ * @function useDespesas
+ * @returns {Object} Objeto contendo despesas, loading e error
+ * @returns {Despesa[]} despesas - Array de despesas com descrição, valor e categoria
+ * @returns {boolean} loading - Indica se os dados estão sendo carregados
+ * @returns {string|null} error - Mensagem de erro, se houver
+ * @example
+ * const { despesas, loading } = useDespesas()
+ * if (!loading) despesas.map(d => <p>{d.description}: R$ {d.amount}</p>)
+ */
 export function useDespesas() {
   const [despesas, setDespesas] = useState<Despesa[]>([])
   const [loading, setLoading] = useState(true)

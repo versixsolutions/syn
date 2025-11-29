@@ -3,6 +3,15 @@ import { supabase } from '../lib/supabase'
 import type { User, Session } from '@supabase/supabase-js'
 import type { UserRole } from '../types'
 
+/**
+ * Interface para perfil de usuário
+ * @interface UserProfile
+ * @property {string} id - ID único do usuário
+ * @property {string} email - Email do usuário
+ * @property {string|null} full_name - Nome completo
+ * @property {UserRole} role - Papel do usuário (admin, sindico, morador, etc)
+ * @property {string|null} condominio_id - ID do condomínio associado
+ */
 interface UserProfile {
   id: string
   email: string
@@ -38,6 +47,15 @@ interface AuthContextType {
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+/**
+ * Hook para usar contexto de autenticação
+ * @function useAuth
+ * @returns {AuthContextType} Contexto de autenticação com user, profile, session, etc
+ * @throws Erro se usado fora de AuthProvider
+ * @example
+ * const { session, profile, signIn } = useAuth()
+ */
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)

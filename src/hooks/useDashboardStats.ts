@@ -2,6 +2,19 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 
+/**
+ * Interface para estatísticas do dashboard
+ * @interface DashboardStats
+ * @property {Object} faq - Estatísticas de FAQ
+ * @property {number} faq.answeredThisMonth - Número de FAQs respondidas este mês
+ * @property {Object} despesas - Estatísticas de despesas
+ * @property {number} despesas.totalMes - Total de despesas do mês
+ * @property {number} despesas.count - Quantidade de despesas
+ * @property {string} despesas.monthLabel - Rótulo do mês
+ * @property {Object} votacoes - Estatísticas de votações
+ * @property {Object} ocorrencias - Estatísticas de ocorrências
+ * @property {Object} comunicados - Estatísticas de comunicados
+ */
 interface DashboardStats {
   faq: { answeredThisMonth: number }
   despesas: { 
@@ -22,6 +35,17 @@ const INITIAL_STATS: DashboardStats = {
   comunicados: { nao_lidos: 0 }
 }
 
+/**
+ * Hook para carregar estatísticas do dashboard
+ * @function useDashboardStats
+ * @returns {Object} Objeto contendo stats e loading
+ * @returns {DashboardStats} stats - Estatísticas carregadas do Supabase (despesas, votações, ocorrências, etc)
+ * @returns {boolean} loading - Indica se os dados estão sendo carregados
+ * @example
+ * const { stats, loading } = useDashboardStats()
+ * if (loading) return <div>Carregando...</div>
+ * return <div>Total despesas este mês: R$ {stats.despesas.totalMes}</div>
+ */
 export function useDashboardStats() {
   const [stats, setStats] = useState<DashboardStats>(INITIAL_STATS)
   const [loading, setLoading] = useState(true)

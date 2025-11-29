@@ -3,6 +3,19 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
+/**
+ * Hook para carregar votações (assembléias) do condomínio
+ * @function useVotacoes
+ * @returns {Object} Objeto contendo votações, loading, error e função votar
+ * @returns {VotacaoWithStats[]} votacoes - Array de votações com estatísticas
+ * @returns {boolean} loading - Indica se os dados estão sendo carregados
+ * @returns {Error|null} error - Erro durante o carregamento, se houver
+ * @returns {Function} votar - Função para registrar voto (com validação de duplicação em 3 níveis)
+ * @example
+ * const { votacoes, votar } = useVotacoes()
+ * await votar(votacaoId, optionId) // retorna boolean indicando sucesso
+ */
+
 // Interfaces atualizadas para refletir o retorno da RPC
 export interface VotacaoWithStats {
   id: string

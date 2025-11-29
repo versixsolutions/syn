@@ -24,6 +24,18 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray
 }
 
+/**
+ * Hook para gerenciar permissões de notificações push
+ * @function usePushNotifications
+ * @returns {Object} Objeto contendo estado e funções de notificação
+ * @returns {boolean} supported - Se o navegador suporta Web Push API
+ * @returns {boolean} subscribed - Se o usuário está inscrito em notificações
+ * @returns {Function} subscribe - Função para se inscrever em notificações push
+ * @returns {Function} unsubscribe - Função para desinscrever de notificações
+ * @example
+ * const { supported, subscribe, subscribed } = usePushNotifications()
+ * if (supported && !subscribed) await subscribe()
+ */
 export function usePushNotifications() {
   const { user } = useAuth()
   const [isSubscribed, setIsSubscribed] = useState(false)
