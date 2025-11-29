@@ -61,7 +61,7 @@
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "https://versix.solutions, https://www.versix.solutions, https://app.versixsolutions.com.br"
+          "value": "https://versixnorma.com.br, https://www.versixnorma.com.br, https://app.versixnorma.com.br"
         },
         {
           "key": "Access-Control-Allow-Methods",
