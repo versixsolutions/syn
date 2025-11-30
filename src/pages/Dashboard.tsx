@@ -193,7 +193,7 @@ export default function Dashboard() {
         <DashboardCard icon="📢" label="Avisos" kpi={stats.comunicados.nao_lidos > 0 ? `${stats.comunicados.nao_lidos} novos` : ''} alert={stats.comunicados.nao_lidos > 0} onClick={() => navigate('/comunicados')} />
         <DashboardCard icon="❓" label="Dúvidas" kpi={`${stats.faq.answeredThisMonth || 0} artigos`} onClick={() => navigate('/faq')} />
         <DashboardCard icon="💰" label="Contas" kpi={formatCurrency(stats.despesas.totalMes)} onClick={() => navigate('/transparencia')} accentColor="text-green-600" />
-        <DashboardCard icon="🗳️" label="Votação" kpi={stats.votacoes.ativas > 0 ? `${stats.votacoes.ativas} ativas` : ''} alert={stats.votacoes.ativas > 0} onClick={() => navigate('/votacoes')} />
+        <DashboardCard icon="🗳️" label="Assembleias" kpi={stats.votacoes.ativas > 0 ? `${stats.votacoes.ativas} ativas` : ''} alert={stats.votacoes.ativas > 0} onClick={() => navigate('/transparencia/assembleias')} />
         <DashboardCard icon="🚨" label="Ocorrências" kpi={stats.ocorrencias.abertas > 0 ? `${stats.ocorrencias.abertas} abertas` : ''} onClick={() => navigate('/ocorrencias')} />
         <DashboardCard icon="📚" label="Documentos" kpi="Biblioteca" onClick={() => navigate('/biblioteca')} />
       </div>
