@@ -37,7 +37,6 @@ function getCategoryStyle(category: string | null) {
 export default function Financeiro() {
   const [despesas, setDespesas] = useState<Despesa[]>([])
   const [loading, setLoading] = useState(true)
-  
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'open'>('all')
   const [selectedMonth, setSelectedMonth] = useState<string>('') 

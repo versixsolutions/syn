@@ -55,11 +55,10 @@ function getVisualTopics(markdown: string): string[] {
 }
 
 export default function Biblioteca() {
-  const { profile, canManage, isAdmin, user } = useAuth() // Pegamos isAdmin aqui
-  const { condominios } = useCondominios() // Hook para listar condomínios no select
-  
+  const { profile, canManage, isAdmin, user } = useAuth()
+  const { condominios } = useCondominios()
   const [docs, setDocs] = useState<Documento[]>([])
-  const [loading, setLoading] = useState(true) // Começa carregando por padrão
+  const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null)

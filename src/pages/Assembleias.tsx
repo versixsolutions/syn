@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAssembleias } from '../hooks/useAssembleias'
 import { useAuth } from '../contexts/AuthContext'
@@ -51,10 +51,9 @@ export default function Assembleias() {
       subtitle="Consulte editais, atas e participe das votações"
       icon="🗳️"
     >
-      <div className="max-w-5xl mx-auto space-y-6">
-        
+      <div className="max-w-5xl mx-auto">
         {/* Header com filtros */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
           <div className="flex gap-2 flex-wrap">
             {['todos', 'agendada', 'em_andamento', 'encerrada', 'cancelada'].map((status) => (
               <button

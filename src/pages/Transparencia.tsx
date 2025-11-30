@@ -103,22 +103,8 @@ export default function Transparencia() {
       subtitle="Acesso completo às informações do condomínio"
       icon="🔍"
     >
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto">
         
-        {/* Introdução */}
-        <div className="bg-blue-50 border border-blue-100 p-5 rounded-xl">
-          <div className="flex items-start gap-3">
-            <span className="text-3xl">💡</span>
-            <div className="flex-1">
-              <h3 className="font-bold text-blue-900 mb-1">Transparência Total</h3>
-              <p className="text-sm text-blue-800 leading-relaxed">
-                Acesse todas as informações sobre assembleias e prestação de contas do condomínio.
-                Mantenha-se informado sobre decisões e movimentação financeira.
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* Cards de Módulos */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           

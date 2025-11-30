@@ -39,15 +39,10 @@ function getCategoryInfo(categoryKey: string) {
 export default function FAQ() {
   const { canManage, profile } = useAuth()
   const navigate = useNavigate()
-  
   const [faqs, setFaqs] = useState<FAQ[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  
-  // Estado para controlar qual categoria está expandida (Accordion Nível 1)
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
-  
-  // Estado para controlar quais perguntas estão expandidas (Accordion Nível 2)
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set())
 
   // Estados do Modal de Importação

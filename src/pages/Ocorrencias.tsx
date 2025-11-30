@@ -30,11 +30,11 @@ const STATUS_CONFIG: any = {
 
 export default function Ocorrencias() {
   const navigate = useNavigate()
-  const { user } = useAuth() // Pegar usuário logado
+  const { user } = useAuth()
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null)
-  const [showOnlyMine, setShowOnlyMine] = useState(false) // Filtro "Minhas"
+  const [showOnlyMine, setShowOnlyMine] = useState(false)
 
   useEffect(() => {
     loadOcorrencias()
