@@ -58,38 +58,44 @@ export default function Suporte() {
       subtitle="Como podemos ajudar você hoje?" 
       icon="🤝"
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-        {services.map((service) => (
-          <div 
-            key={service.title}
-            // Lógica simplificada: Se tem action, executa. Se não, navega para o link.
-            onClick={() => service.action ? service.action() : navigate(service.link!)}
-            className={`
-              relative p-5 rounded-xl border cursor-pointer transition-all duration-200
-              hover:shadow-md hover:-translate-y-1 active:scale-95 bg-white
-              ${service.color.includes('bg-gradient') ? 'border-purple-200' : service.color.replace('text-', 'border-')} 
-            `}
-          >
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-3 shadow-sm ${service.color.split(' ')[0]}`}>
-              {service.icon}
-            </div>
-            
-            <h3 className="text-base font-bold text-gray-900 mb-1">
-              {service.title}
-            </h3>
-            <p className="text-xs text-gray-600 leading-relaxed">
-              {service.description}
-            </p>
-            
-            <div className="mt-3 flex items-center text-xs font-bold uppercase tracking-wider opacity-60">
-              Acessar <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-            </div>
-          </div>
-        ))}
-      </div>
+      <div className="max-w-4xl mx-auto">
+        {/* Grid de Serviços */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {services.map((service) => (
+            <button 
+              key={service.title}
+              onClick={() => service.action ? service.action() : navigate(service.link!)}
+              className={`
+                bg-white border-2 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 
+                text-left group active:scale-95 ${service.color.replace('bg-', 'border-').split(' ')[0].replace('gradient-to-br from-purple-50 to-white', 'purple-200')}
+                ${service.color.includes('gradient') ? 'border-purple-200 hover:border-purple-400' : `${service.color.split(' ').find(c => c.includes('border'))} hover:border-opacity-60`}
+              `}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-3xl group-hover:scale-110 transition-transform ${service.color.split(' ')[0]}`}>
+                  {service.icon}
+                </div>
+              </div>
 
-      {/* Card de Emergência (Mantido Igual) */}
-      <div className="bg-slate-900 rounded-2xl p-6 text-white relative overflow-hidden shadow-lg">
+              <h3 className={`text-xl font-bold mb-2 group-hover:${service.color.split(' ').find(c => c.includes('text'))} transition-colors text-gray-900`}>
+                {service.title}
+              </h3>
+              <p className="text-sm text-gray-600 mb-4 leading-relaxed">
+                {service.description}
+              </p>
+
+              <div className={`mt-4 flex items-center text-sm font-bold group-hover:gap-2 transition-all ${service.color.split(' ').find(c => c.includes('text'))}`}>
+                Acessar
+                <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Card de Emergência */}
+        <div className="bg-slate-900 rounded-2xl p-6 text-white relative overflow-hidden shadow-lg">
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center text-xl animate-pulse">
@@ -129,6 +135,8 @@ export default function Suporte() {
         <div className="absolute -right-10 -bottom-10 opacity-5 text-9xl transform rotate-12 pointer-events-none">
           ☎️
         </div>
+      </div>
+
       </div>
 
       <Chatbot isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
