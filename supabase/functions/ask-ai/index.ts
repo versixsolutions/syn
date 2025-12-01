@@ -1,9 +1,10 @@
 // supabase/functions/ask-ai/index.ts
-// Versão CORRIGIDA, SEGURA e COM RATE LIMITING
+// Versão com busca vetorial real (HuggingFace + Qdrant) e rate limiting
 
 // @deno-types="https://deno.land/std@0.168.0/http/server.ts"
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { generateEmbedding } from '../_shared/embeddings-hf.ts'
 
 // ✅ ORIGENS PERMITIDAS
 const ALLOWED_ORIGINS = [
@@ -75,7 +76,7 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
     const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
 
-    if (!GROQ_API_KEY || !QDRANT_URL) {
+    if (!GROQ_API_KEY || !QDRANT_URL || !QDRANT_API_KEY) {
       throw new Error('Configurações ausentes')
     }
 
@@ -118,42 +119,99 @@ serve(async (req) => {
     console.log(`🔍 Query: "${query}"`)
     console.log(`🏢 Condomínio: ${filter_condominio_id}`)
 
-    // ===== BUSCA DE DOCUMENTOS (QDRANT) =====
-    console.log('🔎 Buscando documentos na Biblioteca...')
+    // ===== EMBEDDING DA QUERY =====
+    console.log('🧠 Gerando embedding da query...')
+    const { embedding: queryEmbedding, error: embError, cached } = await generateEmbedding(query)
 
-    const scrollResp = await fetch(
-      `${QDRANT_URL}/collections/${COLLECTION_NAME}/points/scroll`,
-      {
-        method: 'POST',
-        headers: {
-          'api-key': QDRANT_API_KEY,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          filter: {
-            must: [
-              {
-                key: 'condominio_id',
-                match: { value: filter_condominio_id }
-              }
-            ]
-          },
-          limit: 50,
-          with_payload: true
-        })
-      }
-    )
-
-    if (!scrollResp.ok) {
-      const errorText = await scrollResp.text()
-      console.error('❌ Qdrant Error:', errorText)
-      throw new Error(`Busca falhou: ${errorText}`)
+    if (embError) {
+      console.warn(`⚠️ Erro no embedding: ${embError}. Usando fallback keyword.`)
     }
 
-    const scrollData = await scrollResp.json()
-    const allPoints = scrollData.result?.points || []
+    const hasRealEmbedding = queryEmbedding.some((v) => v !== 0)
+    console.log(`📊 Embedding ${cached ? '(cache)' : '(novo)'}: ${hasRealEmbedding ? 'REAL' : 'FALLBACK'}`)
 
-    console.log(`📄 Total de documentos encontrados: ${allPoints.length}`)
+    let documentResults: any[] = []
+
+    // ===== BUSCA VETORIAL (QDRANT) =====
+    if (hasRealEmbedding) {
+      console.log('🔎 Busca vetorial semântica no Qdrant...')
+
+      const searchResp = await fetch(
+        `${QDRANT_URL}/collections/${COLLECTION_NAME}/points/search`,
+        {
+          method: 'POST',
+          headers: {
+            'api-key': QDRANT_API_KEY,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            vector: queryEmbedding,
+            limit: 5,
+            score_threshold: 0.35,
+            filter: {
+              must: [
+                {
+                  key: 'condominio_id',
+                  match: { value: filter_condominio_id }
+                }
+              ]
+            },
+            with_payload: true
+          })
+        }
+      )
+
+      if (!searchResp.ok) {
+        const errorText = await searchResp.text()
+        console.error('❌ Erro na busca vetorial:', errorText)
+      } else {
+        const searchData = await searchResp.json()
+        documentResults = (searchData.result || []).map((r: any) => ({
+          ...r,
+          type: 'document',
+          relevance_score: r.score
+        }))
+        console.log(`📄 ${documentResults.length} documentos encontrados via busca vetorial`)
+      }
+    }
+
+    // ===== FALLBACK: BUSCA POR KEYWORDS (QDRANT SCROLL) =====
+    let allPoints: any[] = []
+    if (!hasRealEmbedding || documentResults.length === 0) {
+      console.log('⚠️ Fallback: busca por palavras-chave...')
+
+      const scrollResp = await fetch(
+        `${QDRANT_URL}/collections/${COLLECTION_NAME}/points/scroll`,
+        {
+          method: 'POST',
+          headers: {
+            'api-key': QDRANT_API_KEY,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            filter: {
+              must: [
+                {
+                  key: 'condominio_id',
+                  match: { value: filter_condominio_id }
+                }
+              ]
+            },
+            limit: 50,
+            with_payload: true
+          })
+        }
+      )
+
+      if (scrollResp.ok) {
+        const scrollData = await scrollResp.json()
+        allPoints = scrollData.result?.points || []
+      } else {
+        const errorText = await scrollResp.text()
+        console.error('❌ Qdrant Error (scroll):', errorText)
+        allPoints = []
+      }
+    }
 
     // ===== BUSCA DE FAQs =====
     console.log('❓ Buscando FAQs relevantes...')
@@ -178,113 +236,117 @@ serve(async (req) => {
       }
     }
 
-    // ===== FILTRAR MANUALMENTE POR PALAVRAS-CHAVE (MVP) =====
-    // Tokenizar query e normalizar
+    // ===== TOKENIZAÇÃO PARA FALLBACK / FAQ =====
     const queryWords = query
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/[\u0300-\u036f]/g, '')
       .split(/\s+/)
-      .filter((w: string) => w.length > 2) // Filtrar palavras muito curtas
+      .filter((w: string) => w.length > 2)
 
     console.log(`🔍 Buscando por: ${queryWords.join(', ')}`)
 
-    // Calcular score para cada documento
-    const rankedResults = allPoints
-      .map((point: any) => {
-        const content = point.payload.content.toLowerCase()
-        const title = point.payload.title.toLowerCase()
-        
-        let score = 0
-        
-        // Score por palavra no título (peso maior)
-        queryWords.forEach((word: string) => {
-          if (title.includes(word)) {
-            score += 5
-          }
-        })
-        
-        // Score por palavra no conteúdo
-        queryWords.forEach((word: string) => {
-          const matches = (content.match(new RegExp(word, 'g')) || []).length
-          score += matches
-        })
-        
-        // Boost se contém query exata
-        const normalizedQuery = query.toLowerCase()
-        if (content.includes(normalizedQuery)) {
-          score += 10
-        }
-        
-        // Boost se contém frase similar
-        if (title.includes(normalizedQuery)) {
-          score += 15
-        }
-        
-        return { ...point, score, type: 'document' }
-      })
-      .filter((r: any) => r.score > 0)
-      .sort((a: any, b: any) => b.score - a.score)
-      .slice(0, 2) // Top 2 documentos
+    // Se usamos fallback keyword, ranquear documentos manualmente
+    if (!hasRealEmbedding || documentResults.length === 0) {
+      documentResults = allPoints
+        .map((point: any) => {
+          const content = (point.payload.content || '').toLowerCase()
+          const title = (point.payload.title || '').toLowerCase()
 
-    // ===== RANKING DE FAQs =====
+          let score = 0
+
+          queryWords.forEach((word: string) => {
+            if (title.includes(word)) score += 5
+            const matches = (content.match(new RegExp(word, 'g')) || []).length
+            score += matches
+          })
+
+          const normalizedQuery = query.toLowerCase()
+          if (content.includes(normalizedQuery)) score += 10
+          if (title.includes(normalizedQuery)) score += 15
+
+          return { ...point, type: 'document', relevance_score: score / 10 }
+        })
+        .filter((r: any) => r.relevance_score > 0)
+        .sort((a: any, b: any) => b.relevance_score - a.relevance_score)
+        .slice(0, 5)
+    }
+
+    // ===== RANKING DE FAQs (COM OU SEM EMBEDDING) =====
     console.log('⭐ Calculando relevância de FAQs...')
-    const rankedFAQs = faqs
-      .map((faq: any) => {
-        const question = faq.question.toLowerCase()
-        const answer = faq.answer.toLowerCase()
-        
-        let score = 0
-        
-        // Score por palavra na pergunta (peso maior)
-        queryWords.forEach((word: string) => {
-          if (question.includes(word)) {
-            score += 6
-          }
-        })
-        
-        // Score por palavra na resposta
-        queryWords.forEach((word: string) => {
-          const matches = (answer.match(new RegExp(word, 'g')) || []).length
-          score += matches * 0.5
-        })
-        
-        // Boost se contém query exata
+    let faqResults: any[] = []
+
+    if (faqs.length) {
+      if (hasRealEmbedding) {
+        // IA: usar embeddings também para FAQs
+        const faqsWithScores = await Promise.all(
+          faqs.slice(0, 20).map(async (faq: any) => {
+            const { embedding: faqEmb } = await generateEmbedding(faq.question)
+
+            const dotProduct = queryEmbedding.reduce(
+              (sum, val, i) => sum + val * (faqEmb[i] ?? 0),
+              0
+            )
+
+            const similarity = dotProduct
+
+            return {
+              ...faq,
+              type: 'faq',
+              relevance_score: similarity,
+              payload: { title: faq.question, content: faq.answer }
+            }
+          })
+        )
+
+        faqResults = faqsWithScores
+          .filter((f) => f.relevance_score > 0.4)
+          .sort((a, b) => b.relevance_score - a.relevance_score)
+          .slice(0, 3)
+      } else {
+        // Fallback: ranking keyword
         const normalizedQuery = query.toLowerCase()
-        if (question.includes(normalizedQuery)) {
-          score += 20
-        }
-        
-        if (answer.includes(normalizedQuery)) {
-          score += 10
-        }
-        
-        return { 
-          ...faq, 
-          score,
-          type: 'faq',
-          payload: {
-            title: faq.question,
-            content: faq.answer
-          }
-        }
-      })
-      .filter((r: any) => r.score > 0)
-      .sort((a: any, b: any) => b.score - a.score)
-      .slice(0, 2) // Top 2 FAQs
+        faqResults = faqs
+          .map((faq: any) => {
+            const question = faq.question.toLowerCase()
+            const answer = faq.answer.toLowerCase()
+            let score = 0
 
-    // ===== COMBINAR RESULTADOS =====
-    const allResults = [...rankedResults, ...rankedFAQs]
-      .sort((a: any, b: any) => b.score - a.score)
-      .slice(0, 4) // Top 4 resultados combinados
+            queryWords.forEach((word: string) => {
+              if (question.includes(word)) score += 6
+              const matches = (answer.match(new RegExp(word, 'g')) || []).length
+              score += matches * 0.5
+            })
 
-    console.log(`📊 Encontrados ${allResults.length} resultados (${rankedResults.length} docs, ${rankedFAQs.length} FAQs)`)
+            if (question.includes(normalizedQuery)) score += 20
+            if (answer.includes(normalizedQuery)) score += 10
+
+            return {
+              ...faq,
+              type: 'faq',
+              relevance_score: score / 10,
+              payload: { title: faq.question, content: faq.answer }
+            }
+          })
+          .filter((r: any) => r.relevance_score > 0)
+          .sort((a: any, b: any) => b.relevance_score - a.relevance_score)
+          .slice(0, 3)
+      }
+    }
+
+    const allResults = [...documentResults, ...faqResults]
+      .sort((a, b) => b.relevance_score - a.relevance_score)
+      .slice(0, 4)
+
+    console.log(`📊 Encontrados ${allResults.length} resultados combinados`)
 
     if (allResults.length === 0) {
       return new Response(
         JSON.stringify({
-          answer: 'Não encontrei informações sobre isso nos documentos ou FAQs do condomínio. Você pode reformular a pergunta ou verificar se os documentos relevantes foram adicionados na Biblioteca.',
-          sources: []
+          answer:
+            'Não encontrei informações sobre isso nos documentos ou FAQs do condomínio. Você pode reformular a pergunta ou verificar se os documentos relevantes foram adicionados na Biblioteca.',
+          sources: [],
+          search_type: hasRealEmbedding ? 'semantic' : 'keyword'
         }),
         { headers: corsHeaders }
       )
