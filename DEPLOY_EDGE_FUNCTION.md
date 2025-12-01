@@ -1,5 +1,38 @@
 # Deploy da Edge Function process-document
 
+## ⚠️ ATUALIZAÇÃO CRÍTICA (Dezembro 2024)
+
+A **API gratuita do HuggingFace foi descontinuada** (410 Gone). Para continuar usando embeddings reais, você deve:
+
+### Opção Recomendada: HuggingFace Inference Endpoints (Pago)
+
+**Custo:** ~$0.06/hora quando ativo (pausa automática após inatividade)
+
+**Passo a passo:**
+
+1. Acesse: https://ui.endpoints.huggingface.co/
+2. Clique em "New Endpoint"
+3. Configurações:
+   - **Model**: `sentence-transformers/all-MiniLM-L6-v2`
+   - **Region**: `us-east-1` (mais barato)
+   - **Instance**: `CPU - small` (suficiente)
+   - **Auto-scale**: Min 0, Max 1 (economiza)
+   - **Timeout**: 60s
+4. Aguarde deploy (2-3 minutos)
+5. Copie a URL do endpoint (ex: `https://xxxxx.us-east-1.aws.endpoints.huggingface.cloud`)
+6. Configure no Supabase:
+
+```bash
+supabase secrets set HUGGINGFACE_ENDPOINT_URL=https://xxxxx.us-east-1.aws.endpoints.huggingface.cloud
+supabase secrets set HUGGINGFACE_TOKEN=hf_your_token_here
+```
+
+### Opção Alternativa: API Pública (Deprecated - pode falhar)
+
+Se não configurar `HUGGINGFACE_ENDPOINT_URL`, o sistema tenta usar a API pública (descontinuada).
+
+---
+
 ## Problema Identificado
 
 A Edge Function `process-document` foi atualizada para gerar embeddings reais (384D) por chunk, mas o upload não está alimentando a base da Norma.

@@ -38,30 +38,42 @@ async function diagnose() {
     console.log(`   ❌ Erro de conexão Qdrant: ${err.message}\n`);
   }
 
-  // 2. Verificar HuggingFace Token
-  console.log("2️⃣ Verificando HuggingFace Token...");
+  // 2. Verificar HuggingFace Token e Endpoint
+  console.log("2️⃣ Verificando HuggingFace Token e Endpoint...");
   const HF_TOKEN = process.env.HUGGINGFACE_TOKEN;
+  const HF_ENDPOINT_URL = process.env.HUGGINGFACE_ENDPOINT_URL;
+
+  if (HF_ENDPOINT_URL) {
+    console.log(
+      `   🌐 Endpoint customizado: ${HF_ENDPOINT_URL.substring(0, 60)}...`,
+    );
+  } else {
+    console.log(
+      `   ⚠️  HUGGINGFACE_ENDPOINT_URL não configurado (usando API pública deprecated)`,
+    );
+  }
+
   if (HF_TOKEN && HF_TOKEN.startsWith("hf_")) {
     console.log(
       `   ✅ Token HF configurado: ${HF_TOKEN.substring(0, 10)}...\n`,
     );
 
     // Testar embedding
+    const testUrl =
+      HF_ENDPOINT_URL ||
+      "https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2";
     try {
-      const resp = await fetch(
-        "https://router.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${HF_TOKEN}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            inputs: "teste de conexão",
-            options: { wait_for_model: true, use_cache: true },
-          }),
+      const resp = await fetch(testUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${HF_TOKEN}`,
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          inputs: "teste de conexão",
+          options: { wait_for_model: true, use_cache: true },
+        }),
+      });
 
       if (resp.ok) {
         const result = await resp.json();

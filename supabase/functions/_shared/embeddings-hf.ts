@@ -1,8 +1,11 @@
 // Embeddings com HuggingFace usando fetch (Deno Edge Functions não suportam npm packages)
-// Usar endpoint correto conforme documentação atualizada
+// Suporta Inference Endpoints dedicados (pago) ou API pública (descontinuada)
 
+// Prioridade: HUGGINGFACE_ENDPOINT_URL (dedicado) > API pública (deprecated)
+const HF_ENDPOINT_URL = Deno.env.get("HUGGINGFACE_ENDPOINT_URL");
 const HF_API_URL =
-  "https://router.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2";
+  HF_ENDPOINT_URL ||
+  "https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2";
 
 interface EmbeddingResponse {
   embedding: number[];
@@ -39,6 +42,13 @@ export async function generateEmbedding(
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     console.log("✅ Embedding recuperado do cache");
     return { embedding: cached.embedding, cached: true };
+  }
+
+  // Log do endpoint apenas na primeira chamada
+  if (embeddingCache.size === 0) {
+    console.log(
+      `🔗 Usando HuggingFace Endpoint: ${HF_ENDPOINT_URL ? "Dedicado (Pago)" : "API Pública (Deprecated)"}`,
+    );
   }
 
   try {
