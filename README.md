@@ -1,3 +1,20 @@
+# Norma
+
+![CI](https://github.com/versixsolutions/norma/actions/workflows/ci-cd.yml/badge.svg)
+![Coverage](https://img.shields.io/codecov/c/github/versixsolutions/norma?label=coverage)
+
+## Integração CI/CD
+- Pipeline: lint → testes com cobertura → build → release Sentry (em `main`).
+- Secrets necessários: `CODECOV_TOKEN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`.
+- Validação: push em `develop` (coverage no Codecov), push em `main` (release Sentry).
+
+## Cobertura de Testes (snapshot)
+```
+Test Files: 25 passed | 1 skipped (26)
+Tests:      210 passed | 16 skipped (226)
+Coverage:   Lines 16.06% | Statements 15.15% | Branches 13.87% | Funcs 14.77%
+Diretórios: components 40.21% | contexts 69.36% | pages 14.49%
+```
 # 🏢 Versix Norma
 
 [![CI/CD](https://github.com/versixsolutions/norma/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/versixsolutions/norma/actions/workflows/ci-cd.yml)
