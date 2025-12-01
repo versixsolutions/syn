@@ -13,7 +13,7 @@ const QDRANT_API_KEY = process.env.QDRANT_API_KEY!;
 const COLLECTION_NAME =
   process.env.QDRANT_COLLECTION_NAME || "norma_knowledge_base";
 const HF_API_URL =
-  "https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2";
+  "https://router.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2";
 const HF_TOKEN = process.env.HUGGINGFACE_TOKEN;
 
 function splitMarkdownIntoChunks(

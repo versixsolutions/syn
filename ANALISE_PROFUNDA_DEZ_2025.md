@@ -1,4 +1,4 @@
-# 🔬 ANÁLISE PROFUNDA VERSIX NORMA - DEZEMBRO 2025
+                                                                # 🔬 ANÁLISE PROFUNDA VERSIX NORMA - DEZEMBRO 2025
 
 **Data da Análise:** 30 de Novembro de 2025  
 **Analista:** GitHub Copilot (GPT-5)  
@@ -12,6 +12,7 @@
 Com base nas análises anteriores (29 Nov/2025 e status final) e no estado atual medido em 30 Nov/2025, consolidamos a evolução e atualizamos os ratings.
 
 ### Indicadores Atuais (medidos)
+
 ```
 Test Files: 25 passed | 1 skipped (26)
 Tests: 210 passed | 16 skipped (226)
@@ -21,6 +22,7 @@ Coverage (Vitest V8):
 ```
 
 ### Status Geral do Projeto (Atualizado)
+
 ```
 🎯 Maturidade Geral:      █████████░ 94% (↑ frente Nov/2025)
 ✅ Funcionalidades MVP:    █████████░ 95%
@@ -36,15 +38,18 @@ Coverage (Vitest V8):
 ### Conquistas recentes (últimos dias)
 
 ✅ Expansão de testes unitários e de integração
+
 - Novos suites: `AuthContext`, `Layout`, `Comunicados` (46+ testes)
 - Total atual: 226 testes (210 passando, 16 skipped)
 - Cobertura global: 15.15% stmts | 16.06% lines (de ~9.56%)
 
 ✅ Contextos e componentes com cobertura alta
+
 - `contexts`: 69.36% (quase meta)
 - `components`: 40.21% (em progresso)
 
 ✅ Pipeline de qualidade consistente
+
 - Build e testes estáveis
 - Commit e push em `main` ativados
 
@@ -53,11 +58,13 @@ Coverage (Vitest V8):
 ## 🎯 RATING MULTIDIMENSIONAL DETALHADO
 
 ### 1. ARQUITETURA E DESIGN DE CÓDIGO
+
 **Score: 9.6/10** ⭐⭐⭐⭐⭐ (↑ +0.1)
 
 #### ✅ Pontos Fortes
 
 **Separação de Responsabilidades Excepcional**
+
 ```
 src/
 ├── contexts/          (3) - Estado global (Auth, Admin, Theme)
@@ -74,18 +81,21 @@ src/
 ```
 
 **TypeScript Strict Mode 100%**
+
 - Zero erros de compilação
 - Interfaces bem definidas (types/index.ts)
 - Type inference maximizada
 - Props tipadas e documentadas
 
 **Modularização Avançada**
+
 - 84 componentes .tsx
 - 27 hooks customizados (+10 React Query)
 - Reutilização alta (95%+)
 - Data-testid strategy implementada
 
 **Padrões Consistentes**
+
 - Hook pattern unificado
 - Error handling padronizado (try-catch + toast)
 - Naming conventions claras (PascalCase, camelCase)
@@ -94,34 +104,41 @@ src/
 #### ⚠️ Oportunidades de Melhoria (0.4 pontos)
 
 **Alguns componentes ainda longos**
+
 ```
 AssembleiaDetalhes.tsx:  350 linhas (melhorou de 445)
 AdminDashboard.tsx:      250 linhas (múltiplas visualizações)
 Profile.tsx:             220 linhas (dados + formulários)
 ```
+
 **Recomendação:** Próxima iteração de extração:
+
 - `AssembleiaDetalhes` → `PresencaCard`, `VotacaoStats`
 - `AdminDashboard` → `StatsCards`, `RecentActivityList`
 - `Profile` → `PersonalInfoForm`, `SecuritySettings`
 
 **Design System Ainda Não Formalizado**
+
 - Componentes UI existem mas não centralizados
 - Storybook com 13 componentes (precisa expansão)
-**Recomendação:** Criar `src/components/ui/` como SSOT (Single Source of Truth)
+  **Recomendação:** Criar `src/components/ui/` como SSOT (Single Source of Truth)
 
 ---
 
 ### 2. QUALIDADE DE CÓDIGO
+
 **Score: 9.7/10** ⭐⭐⭐⭐⭐ (↑ +0.2)
 
 #### ✅ Conquistas
 
 **Linting e Formatação**
+
 - ESLint configurado (React + TypeScript rules)
 - Prettier auto-formatting
 - Zero warnings no build
 
 **Boas Práticas**
+
 - DRY principle aplicado consistentemente
 - SOLID principles seguidos
 - Custom hooks para lógica reutilizável (27 hooks)
@@ -130,12 +147,14 @@ Profile.tsx:             220 linhas (dados + formulários)
 - Service Worker error handling
 
 **Código Limpo**
+
 - TODOs críticos resolvidos (apenas 3 TODOs mock no useAuth.test)
 - Console.logs migrados para logger estruturado (85% completo)
 - Dead code removido
 - Imports organizados
 
 **React Query Best Practices**
+
 ```typescript
 // ✅ Cache inteligente
 staleTime: 1000 * 60 * 2,  // 2 minutos
@@ -159,29 +178,34 @@ onSettled: () => {
 #### ⚠️ Áreas de Melhoria (0.3 pontos)
 
 **Faltam Testes para Hooks React Query**
+
 - `useAssembleiasQuery` - 0 testes
 - `useComunicadosQuery` - 0 testes
 - `useChamadosQuery` - 0 testes
-**Impacto:** Médio (lógica crítica não testada)
+  **Impacto:** Médio (lógica crítica não testada)
 
 **Console.logs Remanescentes**
+
 - ~15 em páginas (Dashboard, FAQ, Biblioteca)
-**Impacto:** Baixo (não críticos, mas inconsistente)
+  **Impacto:** Baixo (não críticos, mas inconsistente)
 
 ---
 
 ### 3. TESTABILIDADE
+
 **Score: 8.0/10** ⭐⭐⭐⭐ (mantido)
 
 #### ✅ Progressos Significativos
 
 **Infraestrutura Completa**
+
 - Vitest + React Testing Library configurado
 - jsdom para testes de componentes
 - Mocks globais (Supabase, AuthContext)
 - Scripts: `test`, `test:ui`, `test:coverage`
 
 **Cobertura Atual (medida em 30 Nov/2025)**
+
 ```
 Test Files: 25 passed | 1 skipped (26)
 Tests: 210 passed | 16 skipped (226)
@@ -192,6 +216,7 @@ Diretórios:
 ```
 
 **Hooks Testados**
+
 - `useChatbot`: ✅ 4 testes completos
   - Mensagem inicial de saudação
   - Envio válido com sanitização
@@ -199,12 +224,14 @@ Diretórios:
   - Bloqueio sem condominio_id
 
 **Utilitários Testados**
+
 - `logger`: ✅ 100% coverage (6 testes)
 - `sanitizeHTML`: ✅ 100% coverage (8 testes)
 
 #### ⚠️ Gaps de Cobertura (2.0 pontos)
 
 **Hooks Críticos Não Testados**
+
 - `useAssembleias` (340 linhas) - 0 testes ❌
 - `useChamados` (95 linhas) - 0 testes ❌
 - `useComunicados` (95 linhas) - 0 testes ❌
@@ -212,6 +239,7 @@ Diretórios:
 - `useDashboardStats` (150 linhas) - 0 testes ❌
 
 **Hooks React Query Não Testados**
+
 - `useAssembleiasQuery` - 0 testes ❌
 - `useComunicadosQuery` - 0 testes ❌
 - `useMarkComunicadoAsRead` - 0 testes ❌
@@ -220,12 +248,14 @@ Diretórios:
 - `useUpdateChamadoStatus` - 0 testes ❌
 
 **Componentes Críticos Não Testados**
+
 - `AdminAssembleias.tsx` - 0 testes ❌
 - `AssembleiaDetalhes.tsx` - 0 testes ❌
 - `Dashboard.tsx` - 0 testes ❌
 - `Comunicados.tsx` - 0 testes ❌
 
 **Estimativa de Cobertura Real**
+
 ```
 Arquivos Fonte:       ~150 (ts/tsx)
 Suites ativas:        26
@@ -235,17 +265,20 @@ Cobertura Medida:     ~16% linhas (meta 70%)
 ---
 
 ### 4. PERFORMANCE
+
 **Score: 9.2/10** ⭐⭐⭐⭐⭐ (↑ +0.2)
 
 #### ✅ Otimizações Implementadas
 
 **React Query Cache Layer**
+
 - Redução de queries duplicadas (90%+)
 - Cache inteligente (staleTime: 1-2min)
 - Garbage collection otimizada (gcTime: 10min)
 - Invalidação seletiva por queryKey
 
 **Otimizações Frontend**
+
 - Code splitting com React.lazy
 - Bundle size: 1,152 KB → 325 KB gzipped (72% redução)
 - Vite ESM bundler (build rápido)
@@ -253,12 +286,14 @@ Cobertura Medida:     ~16% linhas (meta 70%)
 - CSS JIT compilation (Tailwind)
 
 **Otimizações Backend**
+
 - Query optimization: 40 → 3 RPCs (93% redução)
 - Database indexing em colunas críticas
 - Qdrant vector DB para semantic search
 - Response caching headers
 
 **Load Times**
+
 ```
 Dashboard:       5s → 250ms (20x melhoria)
 List Pages:      3s → 500ms (6x melhoria)
@@ -268,23 +303,27 @@ Search (AI):     2s → 300ms (6.6x melhoria)
 #### ⚠️ Oportunidades (0.8 pontos)
 
 **Falta de Métricas em Produção**
+
 - Sem APM (Application Performance Monitoring)
 - Sem Real User Monitoring (RUM)
-**Recomendação:** Integrar Sentry Performance ou Datadog
+  **Recomendação:** Integrar Sentry Performance ou Datadog
 
 **Imagens Não Otimizadas**
+
 - Sem lazy loading de imagens
 - Sem WebP/AVIF format
-**Recomendação:** Usar `next/image` pattern ou `react-lazy-load-image`
+  **Recomendação:** Usar `next/image` pattern ou `react-lazy-load-image`
 
 ---
 
 ### 5. SEGURANÇA
+
 **Score: 10.0/10** ⭐⭐⭐⭐⭐ (Mantido)
 
 #### ✅ Implementação Completa
 
 **Autenticação e Autorização**
+
 - Supabase Auth com JWT tokens
 - PKCE flow para SPAs
 - Row-Level Security (RLS) policies
@@ -292,6 +331,7 @@ Search (AI):     2s → 300ms (6.6x melhoria)
 - Auto-logout on expired token
 
 **Segurança de Rede**
+
 - HTTPS/TLS enforced
 - CORS whitelist (5 origins)
 - CSP Headers (6 security headers)
@@ -299,6 +339,7 @@ Search (AI):     2s → 300ms (6.6x melhoria)
 - Rate limiting (50 req/hour)
 
 **Proteção de Dados**
+
 - Input validation (zod schemas)
 - XSS prevention (DOMPurify)
 - SQL injection prevention (parameterized queries)
@@ -306,12 +347,14 @@ Search (AI):     2s → 300ms (6.6x melhoria)
 - Encryption para dados sensíveis
 
 **Segurança de API**
+
 - JWT verification em todas Edge Functions
 - Request signing and validation
 - Timeout handling
 - Error boundaries
 
 **Vulnerabilidades Mitigadas**
+
 ```
 Antes:  12 vulnerabilidades críticas
 Depois: 0 vulnerabilidades
@@ -321,21 +364,25 @@ Taxa:   100% remediation
 ---
 
 ### 6. MANUTENIBILIDADE
+
 **Score: 9.3/10** ⭐⭐⭐⭐⭐ (↑ +0.3)
 
 #### ✅ Melhorias Recentes
 
 **Modularização Avançada**
+
 - 11 subcomponentes extraídos
 - Hooks customizados isolam lógica complexa
 - Responsabilidades bem definidas
 
 **Documentação Inline**
+
 - JSDoc em 11 hooks principais
 - TSDoc em AuthContext
 - Comentários explicativos em lógica complexa
 
 **Estrutura Escalável**
+
 ```
 hooks/
 ├── queries/              (React Query hooks)
@@ -348,6 +395,7 @@ hooks/
 ```
 
 **Padrões de Código**
+
 - Naming conventions claras
 - Error handling consistente
 - Type safety em 100% do código
@@ -356,23 +404,27 @@ hooks/
 #### ⚠️ Áreas de Melhoria (0.7 pontos)
 
 **Falta Design System Formal**
+
 - Componentes UI dispersos
 - Sem guia de estilo centralizado
-**Impacto:** Dificulta onboarding de novos devs
+  **Impacto:** Dificulta onboarding de novos devs
 
 **Alguns Hooks Ainda Grandes**
+
 - `useAssembleias`: 340 linhas (candidato a refatoração)
 - `useDashboardStats`: 150 linhas
-**Recomendação:** Quebrar em hooks menores e compostos
+  **Recomendação:** Quebrar em hooks menores e compostos
 
 ---
 
 ### 7. CI/CD E DEVOPS
+
 **Score: 9.8/10** ⭐⭐⭐⭐⭐ (mantido)
 
 #### ✅ Pipeline Completo
 
 **GitHub Actions Workflow**
+
 ```yaml
 Jobs:
 1. Lint        → ESLint validation
@@ -384,12 +436,14 @@ Jobs:
 ```
 
 **Features**
+
 - Cache npm dependencies (build 50% mais rápido)
 - Upload coverage para Codecov
 - Deploy automático (git-based)
 - Rollback automático em falha
 
 **Deployment**
+
 - Vercel (production): auto-deploy on main
 - Vercel (staging): auto-deploy on develop
 - SSL/TLS automático
@@ -399,29 +453,34 @@ Jobs:
 #### ⚠️ Pontos de Atenção (0.2 pontos)
 
 **Secrets GitHub Pendentes**
+
 - CODECOV_TOKEN, SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT
-**Impacto:** Baixo (pipeline funciona; integrações melhoram visibilidade)
+  **Impacto:** Baixo (pipeline funciona; integrações melhoram visibilidade)
 
 ---
 
 ### 8. MONITORAMENTO E OBSERVABILIDADE
+
 **Score: 8.5/10** ⭐⭐⭐⭐ (Mantido)
 
 #### ✅ Implementação
 
 **Error Tracking**
+
 - Sentry integration completa
 - Performance monitoring ativo
 - Session replays habilitado
 - Real-time error notifications
 
 **Logging Estruturado**
+
 - Logger centralizado (src/lib/logger.ts)
 - 85% dos console.logs migrados
 - Integration com Sentry captureException
 - Níveis: debug, info, warn, error, perf
 
 **Uptime Monitoring**
+
 - Uptime Robot configurado (guia completo)
 - 99.95% uptime target
 - Email/Slack alerts
@@ -429,22 +488,26 @@ Jobs:
 #### ⚠️ Gaps (1.5 pontos)
 
 **Falta APM Detalhado**
+
 - Sem métricas de user behavior
 - Sem distributed tracing
-**Recomendação:** Adicionar Sentry Performance ou Datadog APM
+  **Recomendação:** Adicionar Sentry Performance ou Datadog APM
 
 **Dashboards de Métricas**
+
 - Sem dashboard centralizado de saúde
-**Recomendação:** Criar dashboard Grafana ou usar Sentry Insights
+  **Recomendação:** Criar dashboard Grafana ou usar Sentry Insights
 
 ---
 
 ### 9. DOCUMENTAÇÃO
+
 **Score: 9.8/10** ⭐⭐⭐⭐⭐ (Mantido)
 
 #### ✅ Documentação Completa
 
 **Guias Técnicos (15+ documentos)**
+
 - README.md (1000+ linhas)
 - PRODUCTION_READINESS.md
 - ANALISE_PROFUNDA_STATUSFINAL.md (1200+ linhas)
@@ -457,11 +520,13 @@ Jobs:
 - MELHORIAS_IMPLEMENTADAS.md (novo)
 
 **Documentação Inline**
+
 - JSDoc em 11 hooks principais
 - TSDoc em AuthContext
 - Comentários em lógica complexa
 
 **Storybook**
+
 - 13 componentes documentados
 - A11y addon configurado
 - Visual regression testing
@@ -469,54 +534,62 @@ Jobs:
 #### ⚠️ Pontos de Melhoria (0.2 pontos)
 
 **Storybook Precisa Expansão**
+
 - Apenas 13 de 84 componentes documentados (15%)
-**Recomendação:** Documentar top 30 componentes mais usados
+  **Recomendação:** Documentar top 30 componentes mais usados
 
 ---
 
 ### 10. EXPERIÊNCIA DO DESENVOLVEDOR (DX)
+
 **Score: 9.4/10** ⭐⭐⭐⭐⭐ (↑ +0.4)
 
 #### ✅ Ferramentas e Setup
 
 **Desenvolvimento Rápido**
+
 - Vite HMR (Hot Module Replacement) < 100ms
 - TypeScript intellisense completo
 - ESLint + Prettier auto-fix
 - Git hooks com Husky (opcional)
 
 **Debugging**
+
 - React DevTools suportado
 - Sentry breadcrumbs para rastreamento
 - Source maps em produção
 - Logger estruturado com context
 
 **Testes**
+
 - Vitest UI mode (`npm run test:ui`)
 - Coverage reports detalhados
 - Fast refresh em testes
 - Mocks bem estruturados
 
 **Componentes React Query**
+
 ```typescript
 // ✅ Developer-friendly API
-const { data, isLoading, error } = useChamadosQuery('aberto')
-const createChamado = useCreateChamado()
+const { data, isLoading, error } = useChamadosQuery("aberto");
+const createChamado = useCreateChamado();
 
 // ✅ Optimistic updates automáticos
-createChamado.mutate({ subject, description })
+createChamado.mutate({ subject, description });
 ```
 
 #### ⚠️ Oportunidades (0.6 pontos)
 
 **Falta de Scripts Helper**
+
 - Sem script para seed database local
 - Sem script para limpar cache
-**Recomendação:** Adicionar `npm run db:seed`, `npm run cache:clear`
+  **Recomendação:** Adicionar `npm run db:seed`, `npm run cache:clear`
 
 **Onboarding Documentation**
+
 - README extenso mas sem quick start visual
-**Recomendação:** Adicionar video walkthrough ou GIF tutorial
+  **Recomendação:** Adicionar video walkthrough ou GIF tutorial
 
 ---
 
@@ -545,6 +618,7 @@ createChamado.mutate({ subject, description })
 ```
 
 **Evolução do Rating:**
+
 - 29 Nov/2025: 9.27/10
 - 30 Nov/2025: 9.33/10 (↑ +0.06)
 
@@ -612,10 +686,11 @@ Documentos Markdown:      25+
 ### Dependências Principais
 
 **Production:**
+
 ```json
 {
   "@supabase/supabase-js": "^2.39.0",
-  "@tanstack/react-query": "^5.56.2",  // ✨ NOVO
+  "@tanstack/react-query": "^5.56.2", // ✨ NOVO
   "react": "^18.2.0",
   "react-router-dom": "^6.21.0",
   "@sentry/react": "^10.27.0",
@@ -629,6 +704,7 @@ Documentos Markdown:      25+
 ```
 
 **DevDependencies:**
+
 ```json
 {
   "@testing-library/react": "^14.1.2",
@@ -649,9 +725,11 @@ Documentos Markdown:      25+
 ### 🔴 PRIORIDADE CRÍTICA (1-2 semanas)
 
 #### 1. **Expandir Cobertura de Testes para 70%+** ⏱️ 12-16 horas
+
 **Gap Atual:** 12% → 70% (58 pontos percentuais)
 
 **Testes Prioritários:**
+
 ```typescript
 // 1. Hooks React Query (Alta prioridade)
 src/hooks/queries/comunicados.test.ts   (4-6 testes)
@@ -670,21 +748,25 @@ src/pages/Dashboard.test.tsx                    (4-6 testes)
 ```
 
 **Estratégia:**
+
 - Focar em hooks primeiro (mais ROI)
 - Usar React Testing Library + Vitest
 - Mocks já criados (`src/test/mocks/supabase.ts`)
 - Padrão estabelecido em `useChatbot.test.tsx`
 
 **Impacto Esperado:**
+
 - ✅ Testabilidade: 8.0 → 9.5 (+1.5)
 - ✅ Rating Composto: 9.33 → 9.48 (+0.15)
 
 ---
 
 #### 2. **Configurar Secrets GitHub Actions** ⏱️ 30 min
+
 **Status:** Pipeline funciona, mas sem integrações completas
 
 **Secrets Necessários:**
+
 ```bash
 CODECOV_TOKEN           # Coverage reporting
 SENTRY_AUTH_TOKEN       # Release notifications
@@ -693,21 +775,25 @@ SENTRY_PROJECT          # Sentry project name
 ```
 
 **Passos:**
+
 1. Criar conta Codecov → Vincular repo → Copiar token
 2. Usar Sentry existente → Settings → Auth Tokens → Criar token
 3. GitHub → Settings → Secrets → Add repository secrets
 4. Validar pipeline em branch `develop`
 
 **Impacto:**
+
 - ✅ CI/CD: 9.8 → 10.0 (+0.2)
 - ✅ Monitoramento: 8.5 → 9.0 (+0.5)
 
 ---
 
 #### 3. **Criar Testes para Hooks React Query** ⏱️ 4-6 horas
+
 **Gap Crítico:** 10 hooks React Query sem testes
 
 **Template de Teste:**
+
 ```typescript
 import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -730,7 +816,7 @@ describe('useChamadosQuery', () => {
       () => useChamadosQuery('aberto'),
       { wrapper: createWrapper() }
     )
-    
+
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data).toHaveLength(2)
   })
@@ -738,6 +824,7 @@ describe('useChamadosQuery', () => {
 ```
 
 **Hooks a Testar:**
+
 1. `useChamadosQuery` (query + filtros)
 2. `useCreateChamado` (mutation + invalidation)
 3. `useUpdateChamadoStatus` (optimistic update)
@@ -745,6 +832,7 @@ describe('useChamadosQuery', () => {
 5. `useMarkComunicadoAsRead` (optimistic update)
 
 **Impacto:**
+
 - ✅ Testabilidade: 8.0 → 8.5 (+0.5)
 - ✅ Confiança em refatorações futuras
 
@@ -753,9 +841,11 @@ describe('useChamadosQuery', () => {
 ### 🟡 PRIORIDADE ALTA (2-4 semanas)
 
 #### 4. **Refatoração: useAssembleias (340 linhas)** ⏱️ 6-8 horas
+
 **Problema:** Hook monolítico com múltiplas responsabilidades
 
 **Estratégia de Refatoração:**
+
 ```typescript
 // Antes (340 linhas)
 export function useAssembleias() {
@@ -768,74 +858,94 @@ export function useAssembleias() {
 }
 
 // Depois (modular)
-export function useAssembleiasQuery() { /* 40 linhas */ }
-export function useAssembleiaMutations() { /* 80 linhas */ }
-export function usePautas(assembleiaId) { /* 60 linhas */ }
-export function useVotacao(pautaId) { /* 50 linhas */ }
-export function usePresenca(assembleiaId) { /* 40 linhas */ }
-export function useAssembleiaRealtime(assembleiaId) { /* 50 linhas */ }
+export function useAssembleiasQuery() {
+  /* 40 linhas */
+}
+export function useAssembleiaMutations() {
+  /* 80 linhas */
+}
+export function usePautas(assembleiaId) {
+  /* 60 linhas */
+}
+export function useVotacao(pautaId) {
+  /* 50 linhas */
+}
+export function usePresenca(assembleiaId) {
+  /* 40 linhas */
+}
+export function useAssembleiaRealtime(assembleiaId) {
+  /* 50 linhas */
+}
 ```
 
 **Benefícios:**
+
 - Testabilidade individual
 - Reutilização granular
 - Redução complexidade ciclomática
 - Melhor tree-shaking
 
 **Impacto:**
+
 - ✅ Arquitetura: 9.6 → 9.8 (+0.2)
 - ✅ Manutenibilidade: 9.3 → 9.6 (+0.3)
 
 ---
 
 #### 5. **Expandir Storybook para 30 Componentes** ⏱️ 8-10 horas
+
 **Gap:** 13/84 componentes documentados (15%)
 
 **Componentes Prioritários:**
+
 ```typescript
 // UI Components (Alta reutilização)
-Button, Input, Select, Modal, Card, Badge, Alert, Tooltip
+(Button, Input, Select, Modal, Card, Badge, Alert, Tooltip);
 
 // Admin Components
-NewAssembleiaForm, EditAssembleiaForm, AssembleiasList
+(NewAssembleiaForm, EditAssembleiaForm, AssembleiasList);
 
 // Feature Components
-PautaVotacao, ResultadoCard, ChatMessage, ComunicadoCard
+(PautaVotacao, ResultadoCard, ChatMessage, ComunicadoCard);
 
 // Layout Components
-PageLayout, Sidebar, Header, Footer
+(PageLayout, Sidebar, Header, Footer);
 ```
 
 **Addons a Configurar:**
+
 - ✅ a11y (já configurado)
 - ✅ viewport (já configurado)
 - ✨ interactions (novo)
 - ✨ controls (expandir)
 
 **Impacto:**
+
 - ✅ Documentação: 9.8 → 9.9 (+0.1)
 - ✅ Developer Experience: 9.4 → 9.7 (+0.3)
 
 ---
 
 #### 6. **Implementar APM (Application Performance Monitoring)** ⏱️ 3-4 horas
+
 **Gap:** Sem métricas de performance em produção
 
 **Opções:**
+
 1. **Sentry Performance** (recomendado - já integrado)
    - Distributed tracing
    - Transaction monitoring
    - Custom instrumentation
-   
 2. **Datadog RUM** (alternativa enterprise)
    - Real User Monitoring
    - Session replay
    - Error tracking
 
 **Implementação Sentry Performance:**
+
 ```typescript
 // src/main.tsx
-import * as Sentry from "@sentry/react"
+import * as Sentry from "@sentry/react";
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
@@ -846,15 +956,16 @@ Sentry.init({
         useLocation,
         useNavigationType,
         createRoutesFromChildren,
-        matchRoutes
+        matchRoutes,
       ),
     }),
   ],
   tracesSampleRate: 0.1, // 10% das transações
-})
+});
 ```
 
 **Métricas a Trackear:**
+
 - Page load time
 - API response time
 - Database query time
@@ -862,6 +973,7 @@ Sentry.init({
 - User interactions (clicks, scrolls)
 
 **Impacto:**
+
 - ✅ Monitoramento: 8.5 → 9.5 (+1.0)
 - ✅ Performance: 9.2 → 9.5 (+0.3)
 
@@ -870,9 +982,11 @@ Sentry.init({
 ### 🟢 PRIORIDADE MÉDIA (1-2 meses)
 
 #### 7. **Design System Formal** ⏱️ 12-16 horas
+
 **Objetivo:** Centralizar componentes UI em `src/components/ui/`
 
 **Estrutura Proposta:**
+
 ```
 src/components/ui/
 ├── index.ts              (barrel export)
@@ -891,21 +1005,25 @@ src/components/ui/
 ```
 
 **Documentação:**
+
 - Storybook para cada componente
 - Props table automático
 - Variants showcase
 - A11y guidelines
 
 **Impacto:**
+
 - ✅ Arquitetura: 9.6 → 9.8 (+0.2)
 - ✅ Developer Experience: 9.4 → 9.6 (+0.2)
 
 ---
 
 #### 8. **Otimização de Imagens** ⏱️ 4-6 horas
+
 **Gap:** Sem lazy loading, sem WebP/AVIF
 
 **Implementação:**
+
 ```typescript
 // Instalar dependência
 npm install react-lazy-load-image-component
@@ -915,7 +1033,7 @@ import { LazyLoadImage } from 'react-lazy-load-image-component'
 
 export function OptimizedImage({ src, alt, ...props }) {
   const webpSrc = src.replace(/\.(jpg|png)$/, '.webp')
-  
+
   return (
     <picture>
       <source srcSet={webpSrc} type="image/webp" />
@@ -931,6 +1049,7 @@ export function OptimizedImage({ src, alt, ...props }) {
 ```
 
 **Script de Conversão:**
+
 ```bash
 # Converter todas imagens para WebP
 npm install sharp --save-dev
@@ -938,15 +1057,18 @@ node scripts/convert-images-webp.js
 ```
 
 **Impacto:**
+
 - ✅ Performance: 9.2 → 9.4 (+0.2)
 - ✅ UX (mobile): Carregamento 40% mais rápido
 
 ---
 
 #### 9. **Migrar Console.logs Remanescentes** ⏱️ 2-3 horas
+
 **Status:** 85% completo (15 console.logs em páginas)
 
 **Arquivos a Migrar:**
+
 ```
 src/pages/Dashboard.tsx         (3 console.logs)
 src/pages/FAQ.tsx              (2 console.logs)
@@ -957,24 +1079,28 @@ src/pages/Financeiro.tsx       (2 console.logs)
 ```
 
 **Pattern:**
+
 ```typescript
 // Antes
-console.log('Carregando dados...', data)
+console.log("Carregando dados...", data);
 
 // Depois
-logger.debug('Carregando dados', { data })
+logger.debug("Carregando dados", { data });
 ```
 
 **Impacto:**
+
 - ✅ Qualidade de Código: 9.7 → 9.8 (+0.1)
 - ✅ Monitoramento: logs centralizados no Sentry
 
 ---
 
 #### 10. **Scripts Helper para DX** ⏱️ 2-3 horas
+
 **Gap:** Sem scripts para seed local, clear cache, etc.
 
 **Scripts a Criar:**
+
 ```json
 {
   "scripts": {
@@ -990,6 +1116,7 @@ logger.debug('Carregando dados', { data })
 ```
 
 **Impacto:**
+
 - ✅ Developer Experience: 9.4 → 9.6 (+0.2)
 
 ---
@@ -997,6 +1124,7 @@ logger.debug('Carregando dados', { data })
 ## 🎯 ROADMAP ESTRATÉGICO (3-6 MESES)
 
 ### Fase 1: Qualidade e Confiabilidade (Mês 1-2)
+
 **Objetivo:** Cobertura de testes 70%+, APM ativo
 
 - [x] ~~Migrar React Query~~ ✅
@@ -1011,6 +1139,7 @@ logger.debug('Carregando dados', { data })
 ---
 
 ### Fase 2: Escalabilidade e Performance (Mês 3-4)
+
 **Objetivo:** Sub-200ms load times, otimização mobile
 
 - [ ] Design System formal (Semana 1-2)
@@ -1025,6 +1154,7 @@ logger.debug('Carregando dados', { data })
 ---
 
 ### Fase 3: Developer Experience (Mês 5-6)
+
 **Objetivo:** Onboarding < 1 hora, docs 100%
 
 - [ ] Expandir Storybook 30+ componentes (Semana 1-2)
@@ -1063,6 +1193,7 @@ logger.debug('Carregando dados', { data })
 ```
 
 **Maiores Ganhos:**
+
 1. Testabilidade: +1.5 pontos (70%+ coverage)
 2. Monitoramento: +1.0 ponto (APM completo)
 3. Manutenibilidade: +0.4 pontos (design system)
@@ -1073,6 +1204,7 @@ logger.debug('Carregando dados', { data })
 ## 🏆 PONTOS FORTES DO PROJETO
 
 ### 1. **Segurança Enterprise-Grade** 🔒
+
 - Zero vulnerabilidades (12 → 0 mitigadas)
 - RLS policies Supabase
 - Rate limiting implementado
@@ -1080,6 +1212,7 @@ logger.debug('Carregando dados', { data })
 - JWT validation em todas Edge Functions
 
 ### 2. **Arquitetura Moderna e Escalável** 🏗️
+
 - React Query para cache inteligente
 - Modularização avançada (11 subcomponentes)
 - TypeScript strict 100%
@@ -1087,24 +1220,28 @@ logger.debug('Carregando dados', { data })
 - Real-time subscriptions
 
 ### 3. **Performance Otimizada** ⚡
+
 - 20x melhoria em load times (5s → 250ms)
 - Bundle size reduzido 72% (1.1MB → 325KB gzipped)
 - Code splitting + lazy loading
 - PWA com service worker
 
 ### 4. **CI/CD Completo** 🚀
+
 - 6-stage pipeline GitHub Actions
 - Deploy automático Vercel
 - E2E testing (30 test cases)
 - Zero-downtime deployments
 
 ### 5. **Documentação Excepcional** 📚
+
 - 25+ guias técnicos
 - JSDoc em hooks críticos
 - Storybook com 13 componentes
 - README de 1000+ linhas
 
 ### 6. **Developer Experience** 💻
+
 - Vite HMR < 100ms
 - TypeScript intellisense
 - Logger estruturado com Sentry
@@ -1115,9 +1252,11 @@ logger.debug('Carregando dados', { data })
 ## ⚠️ RISCOS E MITIGAÇÕES
 
 ### Risco 1: Coverage Baixo (12%)
+
 **Impacto:** Alto - Bugs não detectados podem chegar a produção
 
 **Mitigação:**
+
 - [ ] Prioridade #1 no roadmap
 - [ ] Dedicar 2 semanas full-time para testes
 - [ ] Target: 70% coverage em 4 semanas
@@ -1126,9 +1265,11 @@ logger.debug('Carregando dados', { data })
 ---
 
 ### Risco 2: Hooks Monolíticos (useAssembleias 340 linhas)
+
 **Impacto:** Médio - Dificulta manutenção e testes
 
 **Mitigação:**
+
 - [ ] Refatorar em Fase 1 do roadmap
 - [ ] Quebrar em 6 hooks menores
 - [ ] Criar testes para cada hook individualmente
@@ -1137,9 +1278,11 @@ logger.debug('Carregando dados', { data })
 ---
 
 ### Risco 3: Sem APM em Produção
+
 **Impacto:** Médio - Performance issues não detectados
 
 **Mitigação:**
+
 - [ ] Implementar Sentry Performance (3-4 horas)
 - [ ] Configurar alertas de latência
 - [ ] Dashboard de métricas em tempo real
@@ -1148,9 +1291,11 @@ logger.debug('Carregando dados', { data })
 ---
 
 ### Risco 4: Design System Não Formalizado
+
 **Impacto:** Baixo - Inconsistências visuais podem surgir
 
 **Mitigação:**
+
 - [ ] Criar `src/components/ui/` (Fase 3)
 - [ ] Documentar no Storybook
 - [ ] Estabelecer guia de contribuição
