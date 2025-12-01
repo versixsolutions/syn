@@ -28,11 +28,11 @@ export default function KeyboardShortcutsHelp() {
 
   return (
     <>
-      {/* Botão de ajuda */}
+      {/* Botão de ajuda - Escondido em mobile */}
       <button
         onClick={() => setIsOpen(true)}
         data-tour="keyboard-shortcuts"
-        className="fixed bottom-24 right-4 md:bottom-4 w-12 h-12 bg-gray-800 text-white rounded-full shadow-lg hover:bg-gray-700 transition z-40 flex items-center justify-center"
+        className="hidden md:flex fixed bottom-4 right-4 w-12 h-12 bg-gray-800 text-white rounded-full shadow-lg hover:bg-gray-700 transition z-40 items-center justify-center"
         aria-label="Atalhos de teclado"
         title="Atalhos de teclado (pressione ?)"
       >
