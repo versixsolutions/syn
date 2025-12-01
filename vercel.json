@@ -14,7 +14,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self' https:; script-src 'self' https: 'unsafe-inline' 'unsafe-eval' *.groq.com *.sentry.io cdn.jsdelivr.net unpkg.com; style-src 'self' https: 'unsafe-inline' fonts.googleapis.com; img-src 'self' https: data: blob:; font-src 'self' https: data: fonts.gstatic.com; connect-src 'self' https: wss: *.supabase.co *.groq.com *.sentry.io *.qdrant.io; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+          "value": "default-src 'self' https:; script-src 'self' https: 'unsafe-inline' 'unsafe-eval' *.groq.com *.sentry.io *.huggingface.co cdn.jsdelivr.net unpkg.com; style-src 'self' https: 'unsafe-inline' fonts.googleapis.com; img-src 'self' https: data: blob:; font-src 'self' https: data: fonts.gstatic.com; connect-src 'self' https: wss: *.supabase.co *.groq.com *.sentry.io *.qdrant.io *.huggingface.co; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         },
         {
           "key": "X-Content-Type-Options",
