@@ -1,48 +1,63 @@
+import { HfInference } from '@huggingface/inference'
+import { readFileSync } from 'fs'
+import { join } from 'path'
+
+// Carregar .env manualmente
+function loadEnv() {
+  try {
+    const envPath = join(process.cwd(), '.env')
+    const envContent = readFileSync(envPath, 'utf-8')
+    const lines = envContent.split('\n')
+    
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (trimmed && !trimmed.startsWith('#')) {
+        const [key, ...valueParts] = trimmed.split('=')
+        if (key && valueParts.length > 0) {
+          process.env[key.trim()] = valueParts.join('=').trim()
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ Não foi possível carregar .env')
+  }
+}
+
+loadEnv()
+
 const QDRANT_URL = process.env.QDRANT_URL!
 const QDRANT_API_KEY = process.env.QDRANT_API_KEY!
 const HF_TOKEN = process.env.HUGGINGFACE_TOKEN!
 const COLLECTION_NAME = process.env.QDRANT_COLLECTION_NAME || 'norma_knowledge_base'
-const HF_API_URL =
-  'https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2'
 
-async function generateEmbedding(text: string): Promise<number[]> {
-  const response = await fetch(HF_API_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${HF_TOKEN}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      inputs: text.substring(0, 512),
-      options: { wait_for_model: true }
-    })
+async function generateEmbedding(text: string, hf: HfInference): Promise<number[]> {
+  const result = await hf.featureExtraction({
+    model: 'sentence-transformers/all-MiniLM-L6-v2',
+    inputs: text.substring(0, 512)
   })
 
-  if (!response.ok) {
-    throw new Error(`HF API error: ${response.status}`)
+  let embedding: number[]
+  
+  if (Array.isArray(result)) {
+    embedding = result as number[]
+  } else {
+    throw new Error('Formato de resposta inesperado')
   }
 
-  const result = await response.json()
-
-  if (Array.isArray(result) && Array.isArray(result[0])) {
-    const dims = result[0].length
-    const embedding = new Array(dims).fill(0)
-
-    for (const tokenEmb of result) {
-      for (let i = 0; i < dims; i++) {
-        embedding[i] += tokenEmb[i] / result.length
-      }
-    }
-
-    const mag = Math.sqrt(embedding.reduce((s, v) => s + v * v, 0))
-    return embedding.map((v) => v / mag)
-  }
-
-  return result
+  // L2 normalize
+  const mag = Math.sqrt(embedding.reduce((s, v) => s + v * v, 0))
+  return embedding.map((v) => v / mag)
 }
 
 async function reindex() {
   console.log('🚀 Iniciando re-indexação com embeddings reais...')
+
+  if (!HF_TOKEN) {
+    console.error('❌ HUGGINGFACE_TOKEN não configurado no .env')
+    process.exit(1)
+  }
+
+  const hf = new HfInference(HF_TOKEN)
 
   console.log('📥 Buscando documentos existentes do Qdrant...')
 
@@ -83,7 +98,7 @@ async function reindex() {
 
       console.log(`🔄 [${processed + 1}/${existingPoints.length}] Processando: ${title.substring(0, 50)}...`)
 
-      const embedding = await generateEmbedding(textForEmbedding)
+      const embedding = await generateEmbedding(textForEmbedding, hf)
 
       newPoints.push({
         id: point.id,

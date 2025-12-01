@@ -1,5 +1,5 @@
 const HF_API_URL =
-  'https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2'
+  'https://router.huggingface.co/sentence-transformers/all-MiniLM-L6-v2'
 
 interface EmbeddingResponse {
   embedding: number[]
