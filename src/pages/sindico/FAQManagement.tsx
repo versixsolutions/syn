@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
-import PageLayout from "../../components/layout/PageLayout";
+import PageLayout from "../../components/PageLayout";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import Modal from "../../components/Modal";
+import Modal from "../../components/ui/Modal";
 
 interface FAQ {
   id: string;

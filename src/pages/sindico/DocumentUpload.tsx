@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-hot-toast";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
-import PageLayout from "../../components/layout/PageLayout";
+import PageLayout from "../../components/PageLayout";
 import LoadingSpinner from "../../components/LoadingSpinner";
 
 interface Document {
