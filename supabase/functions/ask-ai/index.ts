@@ -402,7 +402,11 @@ serve(async (req) => {
                 ...faq,
                 type: "faq",
                 relevance_score: similarity,
-                payload: { title: faq.question, content: faq.answer },
+                payload: {
+                  title: faq.question,
+                  content: faq.answer,
+                  article_reference: faq.article_reference,
+                },
               };
             } catch (_) {
               const q = faq.question.toLowerCase();
@@ -414,7 +418,11 @@ serve(async (req) => {
                 ...faq,
                 type: "faq",
                 relevance_score: score / 10,
-                payload: { title: faq.question, content: faq.answer },
+                payload: {
+                  title: faq.question,
+                  content: faq.answer,
+                  article_reference: faq.article_reference,
+                },
               };
             }
           }),
@@ -471,7 +479,11 @@ serve(async (req) => {
                 ...faq,
                 type: "faq",
                 relevance_score: score / 10,
-                payload: { title: faq.question, content: faq.answer },
+                payload: {
+                  title: faq.question,
+                  content: faq.answer,
+                  article_reference: faq.article_reference,
+                },
               };
             })
             .filter((f) => f.relevance_score >= 0.5)
@@ -512,7 +524,11 @@ serve(async (req) => {
               ...faq,
               type: "faq",
               relevance_score: score / 10,
-              payload: { title: faq.question, content: faq.answer },
+              payload: {
+                title: faq.question,
+                content: faq.answer,
+                article_reference: faq.article_reference,
+              },
             };
           })
           .filter((r: any) => r.relevance_score > 0)
@@ -628,6 +644,9 @@ ${contextText}
       title: sanitizeUTF8(r.payload.title || ""),
       type: r.type,
       relevance_score: r.relevance_score,
+      article_reference: r.payload.article_reference
+        ? sanitizeUTF8(r.payload.article_reference)
+        : undefined,
       excerpt:
         sanitizeUTF8((r.payload.content || "").substring(0, 150)) + "...",
     }));

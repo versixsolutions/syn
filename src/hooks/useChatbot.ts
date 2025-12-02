@@ -228,6 +228,7 @@ export function useChatbot({ isOpen }: UseChatbotParams): UseChatbotReturn {
           const sources = (data as any).sources as Array<{
             title?: string;
             type?: string;
+            article_reference?: string;
           }>;
           // Prioriza mostrar a primeira FAQ; se não houver, mostra o primeiro Documento
           const faqSource = sources.find(
@@ -237,8 +238,15 @@ export function useChatbot({ isOpen }: UseChatbotParams): UseChatbotReturn {
             (s) => (s.type || "").toLowerCase() === "document",
           );
           const chosen = faqSource || docSource;
-          if (chosen?.title) {
-            botResponse = `${botResponseBase}\n\nFonte: ${sanitizeHTML(chosen.title)}`;
+          if (chosen) {
+            // Para FAQs, usar article_reference se disponível; senão usar title
+            const sourceRef =
+              chosen.type === "faq" && chosen.article_reference
+                ? chosen.article_reference
+                : chosen.title;
+            if (sourceRef) {
+              botResponse = `${botResponseBase}\n\nFonte: ${sanitizeHTML(sourceRef)}`;
+            }
           }
         }
         const notFoundKeywords = [
