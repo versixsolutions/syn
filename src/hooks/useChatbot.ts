@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { sanitizeHTML } from "../lib/sanitize";
 import { logger } from "../lib/logger";
+import { recordAIResponseFeedback } from "../lib/feedback";
 
 export interface ChatOption {
   label: string;
@@ -35,6 +36,7 @@ interface UseChatbotReturn {
   ) => Promise<void>;
   handleOptionClick: (opt: ChatOption) => void;
   createTicketFromChat: () => Promise<void>;
+  recordFeedback: (useful: boolean) => Promise<void>;
 }
 
 export function useChatbot({ isOpen }: UseChatbotParams): UseChatbotReturn {
@@ -266,6 +268,10 @@ export function useChatbot({ isOpen }: UseChatbotParams): UseChatbotReturn {
             options,
           },
         ]);
+        lastBotAnswer.current = {
+          text: botResponse,
+          sources: (data as any).sources,
+        };
       } catch (err: any) {
         logger.error("Erro ao enviar mensagem para chatbot", err, {
           userId: user?.id,
@@ -304,6 +310,37 @@ export function useChatbot({ isOpen }: UseChatbotParams): UseChatbotReturn {
     [inputText, profile, user],
   );
 
+  const lastBotAnswer = useRef<{
+    text: string;
+    sources?: Array<{ title?: string; type?: string }>;
+  } | null>(null);
+
+  const recordFeedback = useCallback(
+    async (useful: boolean) => {
+      const answer = lastBotAnswer.current?.text || "";
+      const sources = lastBotAnswer.current?.sources || [];
+      const primary =
+        sources.find((s) => (s.type || "").toLowerCase() === "faq") ||
+        sources[0];
+      try {
+        await recordAIResponseFeedback({
+          context: "chatbot",
+          question: lastQuestion,
+          answer,
+          source_title: primary?.title,
+          source_type: primary?.type as any,
+          useful,
+          user_id: user?.id || null,
+          condominio_id: profile?.condominio_id || null,
+        });
+        logger.info("Feedback registrado", { useful });
+      } catch (err) {
+        logger.warn("Falha ao registrar feedback", err);
+      }
+    },
+    [lastQuestion, user?.id, profile?.condominio_id],
+  );
+
   return {
     messages,
     inputText,
@@ -313,5 +350,6 @@ export function useChatbot({ isOpen }: UseChatbotParams): UseChatbotReturn {
     handleSendMessage,
     handleOptionClick,
     createTicketFromChat,
+    recordFeedback,
   };
 }
