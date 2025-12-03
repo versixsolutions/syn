@@ -4,9 +4,13 @@
 -- Problema: Políticas RLS antigas estavam com referências incorretas
 -- Data: 2025-12-03
 
--- 1. Dropar políticas antigas com nomes incorretos
+-- 1. Dropar TODAS as políticas existentes
 DROP POLICY IF EXISTS "Moradores podem ler FAQs do seu condomínio" ON public.faqs;
 DROP POLICY IF EXISTS "Síndicos e admins podem gerenciar FAQs" ON public.faqs;
+DROP POLICY IF EXISTS "faq_select_policy" ON public.faqs;
+DROP POLICY IF EXISTS "faq_insert_policy" ON public.faqs;
+DROP POLICY IF EXISTS "faq_update_policy" ON public.faqs;
+DROP POLICY IF EXISTS "faq_delete_policy" ON public.faqs;
 
 -- 2. Criar políticas corretas
 

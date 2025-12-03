@@ -1,42 +1,49 @@
-import type { Meta, StoryObj } from '@storybook/react'
-import { useState } from 'react'
-import Modal from './Modal'
+import type { Meta, StoryObj } from "@storybook/react";
+import { useState } from "react";
+import Modal from "./Modal";
 
 const meta = {
-  title: 'Components/UI/Modal',
+  title: "Components/UI/Modal",
   component: Modal,
   parameters: {
-    layout: 'centered',
+    layout: "centered",
     docs: {
       description: {
-        component: 'Modal acessível com focus trap, fechamento por ESC, backdrop blur e scroll lock. Implementa WCAG 2.1 AA com role="dialog" e aria-modal.',
+        component:
+          'Modal acessível com focus trap, fechamento por ESC, backdrop blur e scroll lock. Implementa WCAG 2.1 AA com role="dialog" e aria-modal.',
       },
     },
   },
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   argTypes: {
     isOpen: {
-      control: 'boolean',
-      description: 'Estado de visibilidade do modal',
+      control: "boolean",
+      description: "Estado de visibilidade do modal",
     },
     title: {
-      control: 'text',
-      description: 'Título do modal',
+      control: "text",
+      description: "Título do modal",
     },
     size: {
-      control: 'select',
-      options: ['sm', 'md', 'lg', 'xl', 'full'],
-      description: 'Tamanho do modal',
+      control: "select",
+      options: ["sm", "md", "lg", "xl", "full"],
+      description: "Tamanho do modal",
     },
   },
-} satisfies Meta<typeof Modal>
+} satisfies Meta<typeof Modal>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
-const ModalWrapper = ({ size = 'md', title = 'Título do Modal' }: { size?: 'sm' | 'md' | 'lg' | 'xl' | 'full', title?: string }) => {
-  const [isOpen, setIsOpen] = useState(false)
-  
+const ModalWrapper = ({
+  size = "md",
+  title = "Título do Modal",
+}: {
+  size?: "sm" | "md" | "lg" | "xl" | "full";
+  title?: string;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
     <>
       <button
@@ -45,13 +52,20 @@ const ModalWrapper = ({ size = 'md', title = 'Título do Modal' }: { size?: 'sm'
       >
         Abrir Modal
       </button>
-      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={title} size={size}>
+      <Modal
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        title={title}
+        size={size}
+      >
         <div className="space-y-4">
           <p className="text-gray-600">
-            Este é um exemplo de conteúdo do modal. Você pode adicionar qualquer conteúdo aqui.
+            Este é um exemplo de conteúdo do modal. Você pode adicionar qualquer
+            conteúdo aqui.
           </p>
           <p className="text-gray-600">
-            O modal fecha ao clicar no botão X, pressionar ESC ou clicar fora (no backdrop).
+            O modal fecha ao clicar no botão X, pressionar ESC ou clicar fora
+            (no backdrop).
           </p>
           <div className="flex gap-3 justify-end pt-4 border-t">
             <button
@@ -62,8 +76,8 @@ const ModalWrapper = ({ size = 'md', title = 'Título do Modal' }: { size?: 'sm'
             </button>
             <button
               onClick={() => {
-                alert('Ação confirmada!')
-                setIsOpen(false)
+                alert("Ação confirmada!");
+                setIsOpen(false);
               }}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
             >
@@ -73,29 +87,29 @@ const ModalWrapper = ({ size = 'md', title = 'Título do Modal' }: { size?: 'sm'
         </div>
       </Modal>
     </>
-  )
-}
+  );
+};
 
 export const Default: Story = {
   render: () => <ModalWrapper />,
-}
+};
 
 export const Small: Story = {
   render: () => <ModalWrapper size="sm" title="Modal Pequeno" />,
-}
+};
 
 export const Large: Story = {
   render: () => <ModalWrapper size="lg" title="Modal Grande" />,
-}
+};
 
 export const FullScreen: Story = {
   render: () => <ModalWrapper size="full" title="Modal Tela Cheia" />,
-}
+};
 
 export const WithForm: Story = {
-  render: () => {
-    const [isOpen, setIsOpen] = useState(false)
-    
+  render: function Render() {
+    const [isOpen, setIsOpen] = useState(false);
+
     return (
       <>
         <button
@@ -104,7 +118,11 @@ export const WithForm: Story = {
         >
           Formulário
         </button>
-        <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title="Novo Cadastro">
+        <Modal
+          isOpen={isOpen}
+          onClose={() => setIsOpen(false)}
+          title="Novo Cadastro"
+        >
           <form className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -137,9 +155,9 @@ export const WithForm: Story = {
               <button
                 type="submit"
                 onClick={(e) => {
-                  e.preventDefault()
-                  alert('Formulário enviado!')
-                  setIsOpen(false)
+                  e.preventDefault();
+                  alert("Formulário enviado!");
+                  setIsOpen(false);
                 }}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
               >
@@ -149,6 +167,6 @@ export const WithForm: Story = {
           </form>
         </Modal>
       </>
-    )
+    );
   },
-}
+};

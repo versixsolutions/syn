@@ -9,7 +9,7 @@ import tsParser from '@typescript-eslint/parser'
 
 // Config Flat mínima sem uso de 'eslint/config' para evitar erro de subpath.
 export default [
-  { ignores: ['dist'] },
+  { ignores: ['dist', 'coverage'] },
   {
     files: ['**/*.{ts,tsx,js,jsx}'],
     languageOptions: {
