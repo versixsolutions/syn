@@ -402,10 +402,18 @@ serve(async (req) => {
                 0,
               );
               const similarity = dotProduct;
+              // Keyword boost: if FAQ question contains key concepts, add boost
+              const fq = String(faq.question || "")
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/\p{Diacritic}/gu, "");
+              const containsPiscina = /\bpiscina\b/.test(fq);
+              const containsHorario = /\bhorario\b|\bhorário\b/.test(fq);
+              const keywordBoost = containsPiscina && containsHorario ? 0.3 : 0;
               return {
                 ...faq,
                 type: "faq",
-                relevance_score: similarity,
+                relevance_score: similarity + keywordBoost,
                 payload: {
                   title: faq.question,
                   content: faq.answer,
@@ -418,6 +426,10 @@ serve(async (req) => {
               queryWords.forEach((w: string) => {
                 if (q.includes(w)) score += 1;
               });
+              // Strong keyword boost in fallback for piscina + horário
+              const containsPiscina = /\bpiscina\b/.test(q);
+              const containsHorario = /\bhorario\b|\bhorário\b/.test(q);
+              if (containsPiscina && containsHorario) score += 5;
               return {
                 ...faq,
                 type: "faq",
@@ -557,7 +569,7 @@ serve(async (req) => {
             body: JSON.stringify({
               vector: queryEmbedding,
               limit: 5,
-              score_threshold: 0.3, // Threshold aumentado para maior precisão
+              score_threshold: 0.2, // Threshold reduzido para captar variações comuns
               with_payload: true,
             }),
           },
@@ -567,7 +579,7 @@ serve(async (req) => {
           aiVectorResults = (aiData.result || []).map((r: any) => ({
             ...r,
             type: "faq_ai",
-            relevance_score: r.score + 0.2, // Boost de +0.2 para priorizar AI FAQs
+            relevance_score: r.score + 0.5, // Boost de +0.5 para priorizar fortemente AI FAQs
             payload: {
               ...r.payload,
               title: sanitizeUTF8(r.payload?.question || ""),
