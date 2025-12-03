@@ -11,6 +11,7 @@ const ALLOWED_ORIGINS = [
   "https://versixnorma.com.br",
   "https://www.versixnorma.com.br",
   "https://app.versixnorma.com.br",
+  "https://app.versiximobina.com.br",
   "http://localhost:5173",
   "http://localhost:3000",
 ];
