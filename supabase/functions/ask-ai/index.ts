@@ -541,9 +541,10 @@ serve(async (req) => {
       }
     }
 
-    // ===== BUSCA VETORIAL EM QDRANT PARA AI FAQs (opcional)
+    // ===== BUSCA VETORIAL EM QDRANT PARA AI FAQs (PRIORIDADE MÁXIMA)
     let aiVectorResults: any[] = [];
     if (hasRealEmbedding) {
+      console.log("🎯 Buscando FAQs AI no Qdrant (prioridade máxima)...");
       try {
         const aiSearchResp = await fetch(
           `${QDRANT_URL}/collections/${AI_COLLECTION_NAME}/points/search`,
@@ -555,8 +556,8 @@ serve(async (req) => {
             },
             body: JSON.stringify({
               vector: queryEmbedding,
-              limit: 3,
-              score_threshold: 0.15,
+              limit: 5,
+              score_threshold: 0.3, // Threshold aumentado para maior precisão
               with_payload: true,
             }),
           },
@@ -565,8 +566,8 @@ serve(async (req) => {
           const aiData = await aiSearchResp.json();
           aiVectorResults = (aiData.result || []).map((r: any) => ({
             ...r,
-            type: "faq",
-            relevance_score: r.score,
+            type: "faq_ai",
+            relevance_score: r.score + 0.2, // Boost de +0.2 para priorizar AI FAQs
             payload: {
               ...r.payload,
               title: sanitizeUTF8(r.payload?.question || ""),
@@ -577,17 +578,28 @@ serve(async (req) => {
             },
           }));
           console.log(
-            `🧩 FAQs AI via vetor: ${aiVectorResults.length} resultado(s)`,
+            `🧩 FAQs AI via vetor: ${aiVectorResults.length} resultado(s) | Top score: ${aiVectorResults[0]?.relevance_score?.toFixed(4) || "N/A"}`,
           );
+        } else {
+          const errText = await aiSearchResp.text();
+          console.warn("⚠️ Qdrant AI collection error:", errText);
         }
       } catch (e) {
         console.warn("⚠️ Qdrant busca AI falhou", e);
       }
     }
 
-    // Priorizar FAQs: primeiro FAQs (AI), depois documentos
-    const allResults = [...aiVectorResults, ...faqResults, ...documentResults]
-      .sort((a, b) => b.relevance_score - a.relevance_score)
+    // Priorizar FAQs AI: primeiro AI FAQs, depois FAQs DB, depois documentos
+    const allResults = [
+      ...aiVectorResults.map((r) => ({ ...r, priority: 3 })), // Prioridade máxima
+      ...faqResults.map((r) => ({ ...r, priority: 2 })), // Prioridade alta
+      ...documentResults.map((r) => ({ ...r, priority: 1 })), // Prioridade normal
+    ]
+      .sort((a, b) => {
+        // Primeiro ordena por prioridade, depois por score
+        if (a.priority !== b.priority) return b.priority - a.priority;
+        return b.relevance_score - a.relevance_score;
+      })
       .slice(0, 4);
 
     const searchType =
@@ -595,6 +607,12 @@ serve(async (req) => {
     console.log(
       `📊 Encontrados ${allResults.length} resultados combinados | search_type=${searchType}`,
     );
+
+    if (aiVectorResults.length > 0) {
+      console.log(
+        `✨ ${aiVectorResults.length} FAQ(s) AI encontrada(s) - usando como fonte primária`,
+      );
+    }
 
     if (allResults.length === 0) {
       return new Response(
@@ -618,7 +636,10 @@ serve(async (req) => {
     // ===== MONTAR CONTEXTO PARA GROQ =====
     const contextParts = allResults.map((r: any, i: number) => {
       const source = r.payload.title || "Documento";
-      const type = r.type === "faq" ? "❓ FAQ" : "📄 Documento";
+      let type = "📄 Documento";
+      if (r.type === "faq_ai") type = "⭐ FAQ AI";
+      else if (r.type === "faq") type = "❓ FAQ";
+
       return `[Fonte ${i + 1} - ${type}: ${source}]\n${r.payload.content}`;
     });
 
@@ -631,12 +652,13 @@ serve(async (req) => {
 
 **INSTRUÇÕES CRÍTICAS:**
   1. Responda APENAS com base no CONTEXTO fornecido abaixo
-  2. Se a informação NÃO estiver no contexto, diga: "Não encontrei essa informação nos documentos disponíveis"
-  3. Seja concisa e objetiva (máximo 150 palavras)
-  4. Use bullets quando listar múltiplos itens
-  5. NÃO cite a fonte na resposta (ex: não diga "Segundo a FAQ..." ou "De acordo com...")
-  6. Fale em português do Brasil, de forma profissional mas acessível
-  7. Responda diretamente a pergunta de forma clara e objetiva
+  2. **PRIORIDADE ABSOLUTA:** Se houver uma "⭐ FAQ AI" no contexto, use APENAS ela como fonte principal
+  3. Se a informação NÃO estiver no contexto, diga: "Não encontrei essa informação nos documentos disponíveis"
+  4. Seja concisa e objetiva (máximo 150 palavras)
+  5. Use bullets quando listar múltiplos itens
+  6. NÃO cite a fonte na resposta (ex: não diga "Segundo a FAQ..." ou "De acordo com...")
+  7. Fale em português do Brasil, de forma profissional mas acessível
+  8. Responda diretamente a pergunta de forma clara e objetiva
 
 **CONTEXTO:**
 ${contextText}
