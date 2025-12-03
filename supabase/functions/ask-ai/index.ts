@@ -679,12 +679,16 @@ serve(async (req) => {
     }
 
     // Se não houver resultados relevantes acima de um limite mínimo, tratar como "não encontrei"
+    // Thresholds aumentados para garantir precisão e evitar fontes aleatórias
     const topRelevant = allResults.filter((r) => {
-      const min = r.type === "faq_ai" ? 0.25 : r.type === "faq" ? 0.2 : 0.3;
+      const min = r.type === "faq_ai" ? 0.4 : r.type === "faq" ? 0.35 : 0.45;
       return (r.relevance_score ?? 0) >= min;
     });
 
     if (topRelevant.length === 0) {
+      console.log(
+        "❌ Nenhum resultado com relevância suficiente - retornando sem fontes",
+      );
       return new Response(
         JSON.stringify({
           answer:
@@ -695,6 +699,16 @@ serve(async (req) => {
         { headers: corsHeaders },
       );
     }
+
+    // Log dos resultados que passaram no filtro
+    console.log(
+      `✅ ${topRelevant.length} resultado(s) acima do threshold de relevância`,
+    );
+    topRelevant.forEach((r, i) => {
+      console.log(
+        `  ${i + 1}. [${r.type}] ${r.payload.title.substring(0, 50)}... (score: ${r.relevance_score.toFixed(4)})`,
+      );
+    });
 
     // Log de debug
     if (allResults.length > 0) {
