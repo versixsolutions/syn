@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { supabase } from "../../lib/supabase";
@@ -67,13 +67,7 @@ export default function FAQManagement() {
     { value: "multas", label: "⚠️ Multas", color: "bg-red-100 text-red-700" },
   ];
 
-  useEffect(() => {
-    if (profile?.condominio_id) {
-      loadFAQs();
-    }
-  }, [profile?.condominio_id]);
-
-  async function loadFAQs() {
+  const loadFAQs = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("faqs")
@@ -90,7 +84,13 @@ export default function FAQManagement() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [profile?.condominio_id]);
+
+  useEffect(() => {
+    if (profile?.condominio_id) {
+      loadFAQs();
+    }
+  }, [profile?.condominio_id, loadFAQs]);
 
   function handleOpenNew() {
     setEditingId(null);

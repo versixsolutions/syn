@@ -66,10 +66,9 @@ export default function FinanceiroManagement() {
     if (selectedCondominioId) {
       loadDespesas();
     }
-  }, [selectedCondominioId]);
+  }, [selectedCondominioId, loadDespesas]);
 
-  // --- CRUD BÁSICO ---
-  async function loadDespesas() {
+  const loadDespesas = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -85,7 +84,13 @@ export default function FinanceiroManagement() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [selectedCondominioId]);
+
+  useEffect(() => {
+    if (selectedCondominioId) {
+      loadDespesas();
+    }
+  }, [selectedCondominioId, loadDespesas]);
 
   async function handleDelete(id: string) {
     if (!confirm("Tem certeza que deseja excluir este lançamento?")) return;

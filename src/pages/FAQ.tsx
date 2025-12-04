@@ -184,11 +184,7 @@ export default function FAQ() {
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (profile?.condominio_id) loadFAQs();
-  }, [profile?.condominio_id]);
-
-  async function loadFAQs() {
+  const loadFAQs = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("faqs")
@@ -204,7 +200,11 @@ export default function FAQ() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [profile?.condominio_id]);
+
+  useEffect(() => {
+    if (profile?.condominio_id) loadFAQs();
+  }, [profile?.condominio_id, loadFAQs]);
 
   const toggleQuestion = (id: string) => {
     setExpandedQuestions((prev) => {

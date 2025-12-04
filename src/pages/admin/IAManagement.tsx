@@ -69,10 +69,10 @@ export default function IAManagement() {
         loadDocuments();
       }
     }
-  }, [selectedCondominioId, activeTab]);
+  }, [selectedCondominioId, activeTab, loadDocuments, loadMetrics]);
 
   // === METRICS FUNCTIONS ===
-  async function loadMetrics() {
+  const loadMetrics = useCallback(async () => {
     setLoading(true);
     try {
       // Contar FAQs
@@ -192,7 +192,11 @@ export default function IAManagement() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [selectedCondominioId]);
+
+  useEffect(() => {
+    if (selectedCondominioId) loadMetrics();
+  }, [selectedCondominioId, loadMetrics]);
 
   async function handleReindexVectors() {
     if (!confirm("Reindexar vetores pode levar alguns minutos. Continuar?"))
@@ -207,7 +211,7 @@ export default function IAManagement() {
   }
 
   // === DOCUMENTS FUNCTIONS ===
-  async function loadDocuments() {
+  const loadDocuments = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -225,7 +229,11 @@ export default function IAManagement() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [selectedCondominioId]);
+
+  useEffect(() => {
+    if (selectedCondominioId && activeTab === "documents") loadDocuments();
+  }, [selectedCondominioId, activeTab, loadDocuments]);
 
   const handleReprocess = async (doc: Documento) => {
     const toastId = toast.loading("Reprocessando IA...");

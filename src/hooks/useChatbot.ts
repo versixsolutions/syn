@@ -124,7 +124,7 @@ export function useChatbot({ isOpen }: UseChatbotParams): UseChatbotReturn {
       }
       handleSendMessage(null, option.label);
     },
-    [createTicketFromChat],
+    [createTicketFromChat, handleSendMessage],
   );
 
   const handleSendMessage = useCallback(

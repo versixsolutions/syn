@@ -26,13 +26,7 @@ export default function DocumentUpload() {
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isDragging, setIsDragging] = useState(false);
 
-  useEffect(() => {
-    if (profile?.condominio_id) {
-      loadDocuments();
-    }
-  }, [profile?.condominio_id]);
-
-  async function loadDocuments() {
+  const loadDocuments = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("documents")
@@ -48,7 +42,13 @@ export default function DocumentUpload() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [profile?.condominio_id]);
+
+  useEffect(() => {
+    if (profile?.condominio_id) {
+      loadDocuments();
+    }
+  }, [profile?.condominio_id, loadDocuments]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -70,118 +70,121 @@ export default function DocumentUpload() {
         handleFileUpload(files[0]);
       }
     },
-    [profile?.condominio_id],
+    [handleFileUpload],
   );
 
-  async function handleFileUpload(file: File) {
-    if (!profile?.condominio_id) {
-      toast.error("Condomínio não identificado");
-      return;
-    }
-
-    // Validações
-    const allowedTypes = [
-      "application/pdf",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/msword",
-      "text/plain",
-    ];
-
-    if (!allowedTypes.includes(file.type)) {
-      toast.error("Formato não suportado. Use PDF, DOCX, DOC ou TXT");
-      return;
-    }
-
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      toast.error("Arquivo muito grande. Tamanho máximo: 10MB");
-      return;
-    }
-
-    setUploading(true);
-    const toastId = toast.loading("Fazendo upload do documento...");
-
-    try {
-      // 1. Upload do arquivo para storage
-      const fileName = `${Date.now()}_${file.name}`;
-      const filePath = `${profile.condominio_id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("documents")
-        .upload(filePath, file, {
-          cacheControl: "3600",
-          upsert: false,
-        });
-
-      if (uploadError) throw uploadError;
-
-      // 2. Obter URL pública
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("documents").getPublicUrl(filePath);
-
-      setUploadProgress(50);
-      toast.loading("Processando documento...", { id: toastId });
-
-      // 3. Criar registro no banco
-      const { data: docData, error: dbError } = await supabase
-        .from("documents")
-        .insert([
-          {
-            condominio_id: profile.condominio_id,
-            title: file.name,
-            file_url: publicUrl,
-            file_size: file.size,
-            mime_type: file.type,
-            status: "processing",
-            chunk_count: 0,
-          },
-        ])
-        .select()
-        .single();
-
-      if (dbError) throw dbError;
-
-      setUploadProgress(75);
-
-      // 4. Chamar edge function para processar
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-document`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            document_id: docData.id,
-            file_url: publicUrl,
-            condominio_id: profile.condominio_id,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error("Erro ao processar documento");
+  const handleFileUpload = useCallback(
+    async (file: File) => {
+      if (!profile?.condominio_id) {
+        toast.error("Condomínio não identificado");
+        return;
       }
 
-      setUploadProgress(100);
-      toast.success("Documento enviado e processado com sucesso!", {
-        id: toastId,
-      });
+      // Validações
+      const allowedTypes = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/msword",
+        "text/plain",
+      ];
 
-      // Recarregar lista
-      setTimeout(() => {
-        loadDocuments();
-        setUploadProgress(0);
-      }, 1000);
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || "Erro ao fazer upload", { id: toastId });
-    } finally {
-      setUploading(false);
-    }
-  }
+      if (!allowedTypes.includes(file.type)) {
+        toast.error("Formato não suportado. Use PDF, DOCX, DOC ou TXT");
+        return;
+      }
+
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (file.size > maxSize) {
+        toast.error("Arquivo muito grande. Tamanho máximo: 10MB");
+        return;
+      }
+
+      setUploading(true);
+      const toastId = toast.loading("Fazendo upload do documento...");
+
+      try {
+        // 1. Upload do arquivo para storage
+        const fileName = `${Date.now()}_${file.name}`;
+        const filePath = `${profile.condominio_id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("documents")
+          .upload(filePath, file, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (uploadError) throw uploadError;
+
+        // 2. Obter URL pública
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("documents").getPublicUrl(filePath);
+
+        setUploadProgress(50);
+        toast.loading("Processando documento...", { id: toastId });
+
+        // 3. Criar registro no banco
+        const { data: docData, error: dbError } = await supabase
+          .from("documents")
+          .insert([
+            {
+              condominio_id: profile.condominio_id,
+              title: file.name,
+              file_url: publicUrl,
+              file_size: file.size,
+              mime_type: file.type,
+              status: "processing",
+              chunk_count: 0,
+            },
+          ])
+          .select()
+          .single();
+
+        if (dbError) throw dbError;
+
+        setUploadProgress(75);
+
+        // 4. Chamar edge function para processar
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-document`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({
+              document_id: docData.id,
+              file_url: publicUrl,
+              condominio_id: profile.condominio_id,
+            }),
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error("Erro ao processar documento");
+        }
+
+        setUploadProgress(100);
+        toast.success("Documento enviado e processado com sucesso!", {
+          id: toastId,
+        });
+
+        // Recarregar lista
+        setTimeout(() => {
+          loadDocuments();
+          setUploadProgress(0);
+        }, 1000);
+      } catch (error: any) {
+        console.error(error);
+        toast.error(error.message || "Erro ao fazer upload", { id: toastId });
+      } finally {
+        setUploading(false);
+      }
+    },
+    [profile, loadDocuments],
+  );
 
   async function handleDelete(doc: Document) {
     if (!confirm(`Tem certeza que deseja excluir "${doc.title}"?`)) return;

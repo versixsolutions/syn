@@ -60,7 +60,7 @@ export default function Dashboard() {
     } else {
       setLoadingUpdates(false);
     }
-  }, [profile?.condominio_id, isAdmin]);
+  }, [profile?.condominio_id, isAdmin, loadUnifiedFeed]);
 
   async function loadBanner() {
     try {
@@ -133,7 +133,7 @@ export default function Dashboard() {
     }
   };
 
-  async function loadUnifiedFeed() {
+  const loadUnifiedFeed = useCallback(async () => {
     setLoadingUpdates(true);
     const fetchData = async (table: string, queryBuilder: any) => {
       try {
@@ -300,7 +300,7 @@ export default function Dashboard() {
     } finally {
       setLoadingUpdates(false);
     }
-  }
+  }, [profile?.condominio_id]);
 
   function formatTimeAgo(dateString: string) {
     if (!dateString) return "";
