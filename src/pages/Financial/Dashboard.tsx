@@ -580,7 +580,7 @@ export default function FinancialDashboard() {
             </div>
           </div>
           <div
-            className={`text-xl md:text-3xl font-extrabold tracking-tight break-words ${
+            className={`text-xl md:text-3xl font-bold tracking-tight break-words ${
               summaryData.saldo >= 0 ? "text-emerald-600" : "text-rose-600"
             }`}
           >
@@ -601,7 +601,7 @@ export default function FinancialDashboard() {
               <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-emerald-600" />
             </div>
           </div>
-          <div className="text-xl md:text-3xl font-extrabold tracking-tight text-slate-900 break-words">
+          <div className="text-xl md:text-3xl font-bold tracking-tight text-slate-900 break-words">
             {formatCurrency(summaryData.totalReceitas)}
           </div>
           <p className="text-xs text-emerald-600 font-medium mt-1 md:mt-2 flex items-center gap-1">
@@ -619,7 +619,7 @@ export default function FinancialDashboard() {
               <TrendingDown className="h-4 w-4 md:h-5 md:w-5 text-rose-600" />
             </div>
           </div>
-          <div className="text-xl md:text-3xl font-extrabold tracking-tight text-slate-900 break-words">
+          <div className="text-xl md:text-3xl font-bold tracking-tight text-slate-900 break-words">
             {formatCurrency(summaryData.totalDespesas)}
           </div>
           <p className="text-xs text-rose-600 font-medium mt-1 md:mt-2 flex items-center gap-1">
@@ -637,7 +637,7 @@ export default function FinancialDashboard() {
               <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-amber-600" />
             </div>
           </div>
-          <div className="text-2xl md:text-3xl font-extrabold tracking-tight text-amber-700">
+          <div className="text-2xl md:text-3xl font-bold tracking-tight text-amber-700">
             {summaryData.inadimplenciaMes !== null
               ? formatCurrency(summaryData.inadimplenciaMes)
               : "--"}
