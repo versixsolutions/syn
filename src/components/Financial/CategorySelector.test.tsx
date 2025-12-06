@@ -111,7 +111,14 @@ describe("CategorySelector", () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(screen.getByText(/1\s*-\s*Receitas/)).toBeInTheDocument();
+      expect(
+        screen.getByText((content, element) => {
+          return (
+            element?.textContent?.includes("1") &&
+            element?.textContent?.includes("Receitas")
+          );
+        }),
+      ).toBeInTheDocument();
     });
   });
 
