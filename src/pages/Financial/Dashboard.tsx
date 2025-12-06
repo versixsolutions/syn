@@ -471,7 +471,7 @@ export default function FinancialDashboard() {
       }
     >
       {/* KPIs - Padrão Mural de Comunicados */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
         {/* Saldo Período */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 md:p-6 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-2 md:mb-3">
