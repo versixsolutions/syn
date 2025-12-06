@@ -1,34 +1,35 @@
-import { defineConfig } from 'vitest/config'
-import react from '@vitejs/plugin-react'
-import path from 'path'
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
+import path from "path";
 
-const isCI = process.env.CI === 'true'
+const isCI = process.env.CI === "true";
 
 export default defineConfig({
   plugins: [
     react({
-      jsxRuntime: 'automatic',
+      jsxRuntime: "automatic",
     }),
   ],
   test: {
     globals: true,
-    environment: 'jsdom',
-    setupFiles: './src/test/setup.ts',
+    environment: "jsdom",
+    setupFiles: "./src/test/setup.ts",
     css: true,
     coverage: {
-      provider: 'v8',
-      reporter: ['text', 'html', 'lcov', 'json'],
+      provider: "v8",
+      // include json-summary to generate coverage-summary.json for CI gates
+      reporter: ["text", "html", "lcov", "json", "json-summary"],
       exclude: [
-        'node_modules/',
-        'src/test/',
-        '**/*.stories.tsx',
-        '**/*.config.ts',
-        '**/types/',
-        'cypress/',
-        'scripts/',
-        'supabase/',
+        "node_modules/",
+        "src/test/",
+        "**/*.stories.tsx",
+        "**/*.config.ts",
+        "**/types/",
+        "cypress/",
+        "scripts/",
+        "supabase/",
       ],
-      include: ['src/**/*.{ts,tsx}'],
+      include: ["src/**/*.{ts,tsx}"],
       // In CI, rely on workflow's coverage gate; locally keep strict thresholds
       ...(isCI
         ? {}
@@ -44,7 +45,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      "@": path.resolve(__dirname, "./src"),
     },
   },
-})
+});
