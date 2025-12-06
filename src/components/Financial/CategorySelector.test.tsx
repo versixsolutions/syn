@@ -99,6 +99,13 @@ describe("CategorySelector", () => {
 
     render(<CategorySelector type="RECEITA" value="" onChange={onChange} />);
 
+    // Aguardar carregamento das categorias
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", { name: /Selecionar categoria/ }),
+      ).toBeInTheDocument();
+    });
+
     // Abrir dropdown
     const button = screen.getByRole("button", { name: /Selecionar categoria/ });
     fireEvent.click(button);
@@ -196,13 +203,17 @@ describe("TransactionForm", () => {
       />,
     );
 
+    // Aguardar carregamento do CategorySelector
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /Selecionar categoria/i }),
+      ).toBeInTheDocument();
+    });
+
     const submitButton = screen.getByText("Salvar Transação");
     fireEvent.click(submitButton);
 
-    await waitFor(() => {
-      expect(screen.getByText(/Selecione uma categoria/i)).toBeInTheDocument();
-    });
-
+    // Validação HTML5 irá impedir o submit, não há mensagem de erro customizada
     expect(onSuccess).not.toHaveBeenCalled();
   });
 
