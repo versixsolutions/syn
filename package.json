@@ -13,7 +13,7 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,md}\"",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage",
+    "test:coverage": "vitest --coverage && node scripts/coverage-summary-to-final.js",
     "typecheck": "tsc --noEmit",
     "validate": "npm run typecheck && npm run lint && npm run test -- --run",
     "prepare": "husky install",
