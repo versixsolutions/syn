@@ -471,82 +471,82 @@ export default function FinancialDashboard() {
       }
     >
       {/* KPIs - Padrão Mural de Comunicados */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
         {/* Saldo Período */}
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 md:p-6 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-2 md:mb-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-500 uppercase tracking-wider">
               Saldo Período
             </h3>
-            <div className="bg-indigo-50 p-2 rounded-lg">
-              <Wallet className="h-5 w-5 text-indigo-600" />
+            <div className="bg-indigo-50 p-1.5 md:p-2 rounded-lg">
+              <Wallet className="h-4 w-4 md:h-5 md:w-5 text-indigo-600" />
             </div>
           </div>
           <div
-            className={`text-3xl font-extrabold tracking-tight ${
+            className={`text-xl md:text-3xl font-extrabold tracking-tight break-words ${
               summaryData.saldo >= 0 ? "text-emerald-600" : "text-rose-600"
             }`}
           >
             {formatCurrency(summaryData.saldo)}
           </div>
-          <p className="text-xs font-medium text-slate-400 mt-2">
+          <p className="text-xs font-medium text-slate-400 mt-1 md:mt-2">
             Resultado operacional
           </p>
         </div>
 
         {/* Receita Total */}
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 md:p-6 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-2 md:mb-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-500 uppercase tracking-wider">
               Receita Total
             </h3>
-            <div className="bg-emerald-50 p-2 rounded-lg">
-              <TrendingUp className="h-5 w-5 text-emerald-600" />
+            <div className="bg-emerald-50 p-1.5 md:p-2 rounded-lg">
+              <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-emerald-600" />
             </div>
           </div>
-          <div className="text-3xl font-extrabold tracking-tight text-slate-900">
+          <div className="text-xl md:text-3xl font-extrabold tracking-tight text-slate-900 break-words">
             {formatCurrency(summaryData.totalReceitas)}
           </div>
-          <p className="text-xs text-emerald-600 font-medium mt-2 flex items-center gap-1">
+          <p className="text-xs text-emerald-600 font-medium mt-1 md:mt-2 flex items-center gap-1">
             <ArrowUpCircle size={12} /> Entradas
           </p>
         </div>
 
         {/* Despesa Total */}
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 md:p-6 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-2 md:mb-3">
+            <h3 className="text-xs md:text-sm font-bold text-slate-500 uppercase tracking-wider">
               Despesa Total
             </h3>
-            <div className="bg-rose-50 p-2 rounded-lg">
-              <TrendingDown className="h-5 w-5 text-rose-600" />
+            <div className="bg-rose-50 p-1.5 md:p-2 rounded-lg">
+              <TrendingDown className="h-4 w-4 md:h-5 md:w-5 text-rose-600" />
             </div>
           </div>
-          <div className="text-3xl font-extrabold tracking-tight text-slate-900">
+          <div className="text-xl md:text-3xl font-extrabold tracking-tight text-slate-900 break-words">
             {formatCurrency(summaryData.totalDespesas)}
           </div>
-          <p className="text-xs text-rose-600 font-medium mt-2 flex items-center gap-1">
+          <p className="text-xs text-rose-600 font-medium mt-1 md:mt-2 flex items-center gap-1">
             <ArrowDownCircle size={12} /> Saídas
           </p>
         </div>
 
         {/* Inadimplência */}
-        <div className="rounded-xl border border-amber-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-amber-700 uppercase tracking-wider">
-              Inadimplência
+        <div className="rounded-xl border border-amber-200 bg-white p-4 md:p-6 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-2 md:mb-3">
+            <h3 className="text-xs md:text-sm font-bold text-amber-700 uppercase tracking-wider">
+              Inadimplência ⚠
             </h3>
-            <div className="bg-amber-50 p-2 rounded-lg">
-              <AlertTriangle className="h-5 w-5 text-amber-600" />
+            <div className="bg-amber-50 p-1.5 md:p-2 rounded-lg">
+              <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-amber-600" />
             </div>
           </div>
-          <div className="text-3xl font-extrabold tracking-tight text-amber-700">
+          <div className="text-2xl md:text-3xl font-extrabold tracking-tight text-amber-700">
             {formatPercent(summaryData.inadimplenciaMes)}
           </div>
-          <p className="text-xs font-medium text-amber-600 mt-2 mb-1">
+          <p className="text-xs font-medium text-amber-600 mt-1 md:mt-2 mb-1">
             Inadimplência do mês selecionado
           </p>
-          <div className="text-sm text-amber-700 font-semibold">
+          <div className="text-xs md:text-sm text-amber-700 font-semibold">
             Total: {formatPercent(summaryData.inadimplenciaTotal)}
           </div>
         </div>
