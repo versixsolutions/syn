@@ -1,22 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-} from "recharts";
-import {
   ArrowUpCircle,
   ArrowDownCircle,
   Wallet,
-  Calendar,
   TrendingUp,
   TrendingDown,
   Plus,
   X,
+  BarChart3,
+  LineChart as LineChartIcon,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { formatCurrency, formatDate } from "../../lib/utils";
@@ -24,6 +16,8 @@ import PageLayout from "../../components/PageLayout";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { useAuth } from "../../contexts/AuthContext";
 import { TransactionForm } from "../../components/Financial/TransactionForm";
+import { PeriodSelector } from "../../components/Financial/PeriodSelector";
+import { FinancialCharts } from "../../components/Financial/FinancialCharts";
 
 // Types
 interface Transaction {
@@ -48,14 +42,26 @@ interface MonthlySummary {
 }
 
 export default function FinancialDashboard() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<number | "all">("all");
+  const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [condominioId, setCondominioId] = useState<string>("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [chartType, setChartType] = useState<"bar" | "line">("bar");
+
+  // Verificar se usuário é síndico
+  const isSindico =
+    profile?.role === "sindico" ||
+    profile?.role === "sub_sindico" ||
+    profile?.role === "admin";
+
+  // Inicializar com mês atual
+  useEffect(() => {
+    const currentPeriod = new Date().toISOString().slice(0, 7);
+    setSelectedPeriods([currentPeriod]);
+  }, []);
 
   // Fetch Data
   useEffect(() => {
@@ -111,11 +117,12 @@ export default function FinancialDashboard() {
   // Process Data for Charts & Summary
   const summaryData = useMemo(() => {
     const filtered = transactions.filter((t) => {
-      // Extrair ano e mês diretamente da string para evitar problemas de timezone
-      const [year, month] = t.reference_month.split("-").map(Number);
-      const yearMatch = year === selectedYear;
-      const monthMatch = selectedMonth === "all" || month - 1 === selectedMonth;
-      return yearMatch && monthMatch;
+      // Se nenhum período selecionado, mostrar todos
+      if (selectedPeriods.length === 0) return true;
+
+      // Verificar se a transação está em algum dos períodos selecionados
+      const transactionPeriod = t.reference_month.slice(0, 7); // YYYY-MM
+      return selectedPeriods.includes(transactionPeriod);
     });
 
     const totalReceitas = filtered
@@ -129,46 +136,73 @@ export default function FinancialDashboard() {
     const saldo = totalReceitas - totalDespesas;
 
     return { totalReceitas, totalDespesas, saldo, count: filtered.length };
-  }, [transactions, selectedYear, selectedMonth]);
+  }, [transactions, selectedPeriods]);
 
   const chartData = useMemo(() => {
+    // Se nenhum período selecionado, retornar vazio
+    if (selectedPeriods.length === 0) return [];
+
     // Group by month
     const monthlyData: Record<string, MonthlySummary> = {};
 
-    // Initialize all months for the selected year
-    for (let i = 0; i < 12; i++) {
-      const key = `${selectedYear}-${String(i + 1).padStart(2, "0")}`;
-      monthlyData[key] = {
-        month: new Date(selectedYear, i, 1).toLocaleString("pt-BR", {
+    // Initialize selected periods
+    selectedPeriods.forEach((period) => {
+      const [year, month] = period.split("-").map(Number);
+      monthlyData[period] = {
+        month: new Date(year, month - 1, 1).toLocaleString("pt-BR", {
           month: "short",
+          year: "2-digit",
         }),
         receitas: 0,
         despesas: 0,
         saldo: 0,
       };
-    }
+    });
 
     transactions.forEach((t) => {
-      // Extrair ano e mês diretamente da string para evitar problemas de timezone
-      const [year, month] = t.reference_month
-        .split("-")
-        .slice(0, 2)
-        .map(Number);
-      if (year !== selectedYear) return;
-
-      const key = `${year}-${String(month).padStart(2, "0")}`;
-      if (monthlyData[key]) {
+      const period = t.reference_month.slice(0, 7);
+      if (monthlyData[period]) {
         if (t.amount > 0) {
-          monthlyData[key].receitas += t.amount;
+          monthlyData[period].receitas += t.amount;
         } else {
-          monthlyData[key].despesas += Math.abs(t.amount);
+          monthlyData[period].despesas += Math.abs(t.amount);
         }
-        monthlyData[key].saldo += t.amount;
+        monthlyData[period].saldo += t.amount;
       }
     });
 
-    return Object.values(monthlyData);
-  }, [transactions, selectedYear]);
+    // Ordenar por período
+    return Object.keys(monthlyData)
+      .sort()
+      .map((key) => monthlyData[key]);
+  }, [transactions, selectedPeriods]);
+
+  // Process category data for pie chart
+  const categoryData = useMemo(() => {
+    const filtered = transactions.filter((t) => {
+      if (selectedPeriods.length === 0) return true;
+      const transactionPeriod = t.reference_month.slice(0, 7);
+      return selectedPeriods.includes(transactionPeriod) && t.amount < 0; // Apenas despesas
+    });
+
+    const categoryMap: Record<string, number> = {};
+    let total = 0;
+
+    filtered.forEach((t) => {
+      const categoryName = t.category?.name || "Outros";
+      const value = Math.abs(t.amount);
+      categoryMap[categoryName] = (categoryMap[categoryName] || 0) + value;
+      total += value;
+    });
+
+    return Object.entries(categoryMap)
+      .map(([name, value]) => ({
+        name,
+        value,
+        percentage: total > 0 ? (value / total) * 100 : 0,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [transactions, selectedPeriods]);
 
   if (loading)
     return <LoadingSpinner message="Carregando dados financeiros..." />;
@@ -184,40 +218,45 @@ export default function FinancialDashboard() {
       subtitle="Visão geral das finanças do condomínio"
       icon="📊"
       headerAction={
-        <div className="flex gap-2 items-center">
-          <button
-            onClick={() => setShowTransactionForm(true)}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            Nova Transação
-          </button>
-          <select
-            className="bg-white border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5"
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-          >
-            <option value={2025}>2025</option>
-            <option value={2024}>2024</option>
-          </select>
-          <select
-            className="bg-white border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5"
-            value={selectedMonth}
-            onChange={(e) =>
-              setSelectedMonth(
-                e.target.value === "all" ? "all" : Number(e.target.value),
-              )
-            }
-          >
-            <option value="all">Todo o Ano</option>
-            {Array.from({ length: 12 }, (_, i) => (
-              <option key={i} value={i}>
-                {new Date(2025, i, 1).toLocaleString("pt-BR", {
-                  month: "long",
-                })}
-              </option>
-            ))}
-          </select>
+        <div className="flex gap-3 items-center flex-wrap">
+          <PeriodSelector
+            selectedPeriods={selectedPeriods}
+            onPeriodsChange={setSelectedPeriods}
+            availableYears={[2024, 2025, 2026]}
+          />
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+            <button
+              onClick={() => setChartType("bar")}
+              className={`p-2 rounded transition-colors ${
+                chartType === "bar"
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+              title="Gráfico de Barras"
+            >
+              <BarChart3 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setChartType("line")}
+              className={`p-2 rounded transition-colors ${
+                chartType === "line"
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+              title="Gráfico de Linhas"
+            >
+              <LineChartIcon className="h-4 w-4" />
+            </button>
+          </div>
+          {isSindico && (
+            <button
+              onClick={() => setShowTransactionForm(true)}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Nova Transação
+            </button>
+          )}
         </div>
       }
     >
@@ -282,161 +321,12 @@ export default function FinancialDashboard() {
         </div>
       </div>
 
-      {/* Filtros Horizontais - Padrão Mural */}
-      <div className="mb-6 overflow-x-auto">
-        <div className="flex gap-2 pb-2">
-          <button
-            onClick={() => setSelectedMonth("all")}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors shrink-0 ${
-              selectedMonth === "all"
-                ? "bg-slate-900 text-white"
-                : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            <Calendar className="h-4 w-4" />
-            Todos
-          </button>
-          {Array.from({ length: 9 }, (_, i) => {
-            const monthName = new Date(2025, i, 1).toLocaleString("pt-BR", {
-              month: "short",
-            });
-            return (
-              <button
-                key={i}
-                onClick={() => setSelectedMonth(i)}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors shrink-0 ${
-                  selectedMonth === i
-                    ? "bg-emerald-600 text-white"
-                    : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                {monthName.charAt(0).toUpperCase() + monthName.slice(1)}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Charts Section - Redesigned */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h3 className="text-lg font-bold tracking-tight text-slate-900">
-                Evolução do Caixa
-              </h3>
-              <p className="text-sm text-slate-500">
-                Receitas vs. Despesas no período
-              </p>
-            </div>
-            <div className="flex gap-4 text-xs font-bold">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-indigo-600"></div>{" "}
-                Receita
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-slate-400"></div>{" "}
-                Despesa
-              </div>
-            </div>
-          </div>
-          <div className="flex-grow h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={chartData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="#f0f0f0"
-                />
-                <XAxis
-                  dataKey="month"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "#9ca3af", fontSize: 12 }}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "#9ca3af", fontSize: 12 }}
-                  tickFormatter={(value) => `R$ ${value / 1000}k`}
-                />
-                <RechartsTooltip
-                  cursor={{ fill: "#f9fafb" }}
-                  contentStyle={{
-                    borderRadius: "8px",
-                    border: "none",
-                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                  }}
-                  formatter={(value: number) => formatCurrency(value)}
-                />
-                <Bar
-                  dataKey="receitas"
-                  name="Receitas"
-                  fill="#10B981"
-                  radius={[4, 4, 0, 0]}
-                  barSize={20}
-                />
-                <Bar
-                  dataKey="despesas"
-                  name="Despesas"
-                  fill="#EF4444"
-                  radius={[4, 4, 0, 0]}
-                  barSize={20}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-          <h3 className="text-lg font-bold text-gray-800 mb-6">
-            Maiores Despesas
-          </h3>
-          <div className="space-y-4">
-            {transactions
-              .filter((t) => {
-                if (t.amount >= 0) return false;
-                if (selectedMonth === "all") return true;
-                const [, month] = t.reference_month.split("-").map(Number);
-                return month - 1 === selectedMonth;
-              })
-              .sort((a, b) => a.amount - b.amount) // Sort by most negative (largest expense)
-              .slice(0, 5)
-              .map((t) => (
-                <div
-                  key={t.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100"
-                >
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="p-2 bg-white rounded-full border border-gray-200 text-gray-500 shrink-0">
-                      <TrendingDown size={16} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-gray-800 truncate">
-                        {t.category?.name || "Outros"}
-                      </p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {t.description}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-red-600 whitespace-nowrap">
-                    {formatCurrency(Math.abs(t.amount))}
-                  </span>
-                </div>
-              ))}
-
-            {transactions.filter((t) => t.amount < 0).length === 0 && (
-              <div className="text-center py-8 text-gray-400 text-sm">
-                Nenhuma despesa registrada no período.
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* Financial Charts - New Design */}
+      <FinancialCharts
+        monthlyData={chartData}
+        categoryData={categoryData}
+        chartType={chartType}
+      />
 
       {/* Recent Transactions Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -462,9 +352,9 @@ export default function FinancialDashboard() {
             <tbody className="divide-y divide-gray-100">
               {transactions
                 .filter((t) => {
-                  if (selectedMonth === "all") return true;
-                  const [, month] = t.reference_month.split("-").map(Number);
-                  return month - 1 === selectedMonth;
+                  if (selectedPeriods.length === 0) return true;
+                  const transactionPeriod = t.reference_month.slice(0, 7);
+                  return selectedPeriods.includes(transactionPeriod);
                 })
                 .slice(0, 10)
                 .map((t) => (
